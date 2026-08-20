@@ -35,7 +35,7 @@ export default async function DashboardLayout({
     .maybeSingle();
 
   return (
-    <div className="flex min-h-dvh flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="app-shell flex flex-col bg-slate-50 dark:bg-slate-950">
       <Sidebar />
       <div className="flex flex-1 flex-col md:pl-64">
         <Header

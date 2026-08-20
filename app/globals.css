@@ -78,3 +78,14 @@
     zoom: 0.9;
   }
 }
+
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.dialog-scroll {
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+}

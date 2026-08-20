@@ -157,7 +157,7 @@ export function PreorderFormDialog({
           )}
         </DialogTrigger>
       )}
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="dialog-scroll">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar pedido" : "Anotar pedido"}</DialogTitle>
           <DialogDescription>

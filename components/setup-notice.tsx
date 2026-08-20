@@ -2,7 +2,7 @@ import { TriangleAlert } from "lucide-react";
 
 export function SetupNotice() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
+    <div className="app-shell flex items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
       <div className="w-full max-w-sm rounded-xl border border-amber-200 bg-white p-6 text-center shadow-sm dark:border-amber-800 dark:bg-slate-900">
         <TriangleAlert className="mx-auto h-8 w-8 text-amber-500" />
         <h1 className="mt-3 text-lg font-bold text-slate-900 dark:text-slate-100">
