@@ -139,6 +139,7 @@ function SignupForm() {
           full_name: values.fullName.trim(),
           business_name: values.businessName?.trim() || null,
         },
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     });
 
@@ -246,6 +247,18 @@ export default function LoginPage() {
 }
 
 function LoginPageInner() {
+  const router = useRouter();
+
+  React.useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.push("/");
+        router.refresh();
+      }
+    });
+  }, [router]);
+
   return (
     <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <CardHeader>

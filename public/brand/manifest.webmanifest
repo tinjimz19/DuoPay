@@ -1,0 +1,18 @@
+{
+  "name": "Manual de Marca · DuoPay",
+  "short_name": "Manual DuoPay",
+  "description": "Manual de marca de DuoPay: logotipo dp unificado, paleta de color, tipografía, iconografía y usos correctos.",
+  "lang": "es",
+  "start_url": "/brand/",
+  "scope": "/brand/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "categories": ["business", "finance"],
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 120">
+  <g transform="translate(6,12) scale(0.8)">
+    <path d="M71 32 A28 28 0 0 0 71 88" fill="none" stroke="#4F46E5" stroke-width="22" stroke-linecap="round"/>
+    <rect x="71" y="8" width="18" height="104" rx="9" fill="#4F46E5"/>
+  </g>
+  <text x="100" y="76" font-family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="46" font-weight="700" letter-spacing="-1">
+    <tspan fill="#0F172A">Duo</tspan><tspan fill="#4F46E5">Pay</tspan>
+  </text>
+</svg>
