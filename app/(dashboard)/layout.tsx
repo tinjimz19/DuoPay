@@ -43,7 +43,7 @@ export default async function DashboardLayout({
           fullName={profile?.full_name ?? null}
           businessName={profile?.business_name ?? null}
         />
-        <main className="mx-auto w-full max-w-md flex-1 px-4 pb-12 pt-4 sm:max-w-3xl lg:max-w-5xl">
+        <main className="mx-auto w-full max-w-md flex-1 px-4 pb-28 pt-4 sm:max-w-3xl lg:max-w-5xl">
           {children}
         </main>
       </div>
