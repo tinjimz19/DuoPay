@@ -74,4 +74,7 @@
     @apply bg-background text-foreground;
     font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   }
+  html.android-zoom {
+    zoom: 0.9;
+  }
 }

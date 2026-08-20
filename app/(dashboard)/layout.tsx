@@ -35,15 +35,15 @@ export default async function DashboardLayout({
     .maybeSingle();
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
+    <div className="flex min-h-dvh flex-col bg-slate-50 dark:bg-slate-950">
       <Sidebar />
-      <div className="md:pl-64">
+      <div className="flex flex-1 flex-col md:pl-64">
         <Header
           email={user.email ?? ""}
           fullName={profile?.full_name ?? null}
           businessName={profile?.business_name ?? null}
         />
-        <main className="mx-auto w-full max-w-md px-4 pb-32 pt-4 sm:max-w-3xl md:pb-12 lg:max-w-5xl">
+        <main className="mx-auto w-full max-w-md flex-1 px-4 pb-12 pt-4 sm:max-w-3xl lg:max-w-5xl">
           {children}
         </main>
       </div>

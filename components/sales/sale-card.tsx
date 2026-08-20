@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { deleteSale, recordPayment } from "@/actions/sale-actions";
+import { getEuroRate } from "@/actions/rates";
 import { CategoryBadge } from "@/components/category-badge";
 import { SaleStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/format";
+import { formatBs, formatCurrency } from "@/lib/format";
 import type { ProductCategory, SaleStatus } from "@/types/database.types";
 
 export interface PaymentRecord {
@@ -59,6 +60,22 @@ export function SaleCard({ sale }: { sale: SaleCardData }) {
   const [pending, startTransition] = React.useTransition();
   const [customAmount, setCustomAmount] = React.useState("");
   const [notes, setNotes] = React.useState("");
+  const [euroRate, setEuroRate] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let active = true;
+    getEuroRate()
+      .then((r) => {
+        if (active) setEuroRate(r.rate);
+      })
+      .catch(() => {
+        if (active) setEuroRate(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   const paid = Number(sale.amount_paid);
   const total = Number(sale.total_amount);
@@ -111,6 +128,12 @@ export function SaleCard({ sale }: { sale: SaleCardData }) {
   }
 
   const parsedCustom = parseFloat(customAmount.replace(",", "."));
+
+  const suggestedBs = euroRate ? suggested * euroRate : null;
+  const customBs =
+    euroRate && Number.isFinite(parsedCustom) && parsedCustom > 0
+      ? parsedCustom * euroRate
+      : null;
 
   return (
     <div className="relative">
@@ -204,6 +227,11 @@ export function SaleCard({ sale }: { sale: SaleCardData }) {
                 {pending && <Loader2 className="animate-spin" />}
                 Abonar cuota {nextNumber} · {formatCurrency(suggested)}
               </Button>
+              {suggestedBs != null && (
+                <p className="-mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+                  ≈ {formatBs(suggestedBs)}
+                </p>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="custom-amount">Monto personalizado</Label>
@@ -233,6 +261,11 @@ export function SaleCard({ sale }: { sale: SaleCardData }) {
                     Abonar
                   </Button>
                 </div>
+                {customBs != null && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    ≈ {formatBs(customBs)}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -55,6 +56,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <Script id="android-zoom" strategy="beforeInteractive">
+            {`if (/Android/i.test(navigator.userAgent)) { document.documentElement.classList.add("android-zoom"); }`}
+          </Script>
           {children}
           <Toaster position="top-center" richColors />
         </ThemeProvider>

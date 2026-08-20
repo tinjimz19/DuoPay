@@ -1,6 +1,8 @@
 import { CheckCheck, HandCoins, PackagePlus, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
+import { getEuroRate } from "@/actions/rates";
+import { RateCard } from "@/components/rates/rate-card";
 import { SaleStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +16,13 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const supabase = createClient();
+
+  let initialRate: Awaited<ReturnType<typeof getEuroRate>> | null = null;
+  try {
+    initialRate = await getEuroRate();
+  } catch {
+    initialRate = null;
+  }
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -84,6 +93,10 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <section>
+        <RateCard initial={initialRate} />
+      </section>
+
+      <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Resumen
         </h2>
@@ -116,7 +129,7 @@ export default async function DashboardPage() {
         </h2>
         <div className="grid grid-cols-2 gap-3">
           <Button asChild className="h-14 text-sm">
-            <Link href="/ventas/nueva">+ Registrar entrega (Fiado)</Link>
+            <Link href="/ventas/nueva">+ Registrar entrega</Link>
           </Button>
           <Button asChild variant="outline" className="h-14 text-sm">
             <Link href="/pedidos?nuevo=1">+ Anotar pedido</Link>
