@@ -6,7 +6,11 @@ import { z } from "zod";
 
 const createClientSchema = z.object({
   name: z.string().min(2, "El nombre es obligatorio").max(120),
-  phone: z.string().max(30).optional().nullable(),
+  phone: z
+    .string()
+    .trim()
+    .min(7, "El número de teléfono es obligatorio")
+    .max(30),
   notes: z.string().max(500).optional().nullable(),
 });
 
@@ -37,7 +41,7 @@ export async function createClient(
     .insert({
       user_id: user.id,
       name: parsed.name.trim(),
-      phone: parsed.phone?.trim() || null,
+      phone: parsed.phone.trim(),
       notes: parsed.notes?.trim() || null,
     })
     .select("id")
@@ -58,7 +62,11 @@ export async function createClient(
 const updateClientSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(2, "El nombre es obligatorio").max(120),
-  phone: z.string().max(30).optional().nullable(),
+  phone: z
+    .string()
+    .trim()
+    .min(7, "El número de teléfono es obligatorio")
+    .max(30),
   notes: z.string().max(500).optional().nullable(),
 });
 
@@ -81,7 +89,7 @@ export async function updateClient(
     .from("clients")
     .update({
       name: parsed.name.trim(),
-      phone: parsed.phone?.trim() || null,
+      phone: parsed.phone.trim(),
       notes: parsed.notes?.trim() || null,
     })
     .eq("id", parsed.id)

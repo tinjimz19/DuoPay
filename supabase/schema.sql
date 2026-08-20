@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   name TEXT NOT NULL,
-  phone TEXT,
+  phone TEXT NOT NULL,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -153,3 +153,9 @@ CREATE POLICY "Aislamiento por usuario en pedidos"
   WITH CHECK (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_preorders_user_id ON public.preorders(user_id);
+
+
+-- 6. MIGRACIÓN: teléfono del cliente obligatorio (para bases existentes)
+-- En una base ya creada, completa los teléfonos que faltan y marca la columna NOT NULL:
+--   UPDATE public.clients SET phone = '0000000' WHERE phone IS NULL OR phone = '';
+--   ALTER TABLE public.clients ALTER COLUMN phone SET NOT NULL;

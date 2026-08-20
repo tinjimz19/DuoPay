@@ -80,8 +80,7 @@ export default async function ClienteDetailPage({
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
-  const phone = client.phone ? normalizePhone(client.phone) : "";
-  const whatsappUrl = phone ? `https://wa.me/${phone}` : null;
+  const whatsappUrl = `https://wa.me/${normalizePhone(client.phone)}`;
 
   const preorderList = (preorders ?? []) as unknown as {
     id: string;
@@ -105,7 +104,7 @@ export default async function ClienteDetailPage({
                 {client.name}
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {client.phone || "Sin teléfono"} · Cliente desde{" "}
+                {client.phone} · Cliente desde{" "}
                 {formatDate(client.created_at)}
               </p>
             </div>
@@ -113,26 +112,22 @@ export default async function ClienteDetailPage({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {whatsappUrl && (
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
-              >
-                <MessageCircle className="h-4 w-4" />
-                WhatsApp
-              </a>
-            )}
-            {client.phone && (
-              <a
-                href={`tel:${client.phone}`}
-                className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Phone className="h-4 w-4" />
-                Llamar
-              </a>
-            )}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </a>
+            <a
+              href={`tel:${client.phone}`}
+              className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <Phone className="h-4 w-4" />
+              Llamar
+            </a>
           </div>
 
           {client.notes && (

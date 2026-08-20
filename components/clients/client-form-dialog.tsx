@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 export interface ClientFormData {
   id: string;
   name: string;
-  phone: string | null;
+  phone: string;
   notes: string | null;
 }
 
@@ -40,10 +40,9 @@ const clientSchema = z.object({
   name: z.string().min(2, "Escribe el nombre del cliente"),
   phone: z
     .string()
-    .max(30)
-    .transform((v) => v.trim())
-    .optional()
-    .or(z.literal("")),
+    .trim()
+    .min(7, "El número de teléfono es obligatorio")
+    .max(30),
   notes: z
     .string()
     .max(500)
@@ -149,10 +148,7 @@ export function ClientFormDialog({
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Teléfono{" "}
-                    <span className="text-slate-400">(opcional)</span>
-                  </FormLabel>
+                  <FormLabel>Teléfono</FormLabel>
                   <FormControl>
                     <Input
                       type="tel"
