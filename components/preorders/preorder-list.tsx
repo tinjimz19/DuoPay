@@ -18,10 +18,10 @@ const CATEGORY_TABS = [
 
 const STATUS_TABS: { value: "all" | PreorderStatus; label: string }[] = [
   { value: "all", label: "Todos" },
-  { value: "PENDENT", label: "Pendiente" },
-  { value: "ORDERED", label: "Comprado" },
-  { value: "DELIVERED", label: "Entregado" },
-  { value: "CANCELLED", label: "Cancelado" },
+  { value: "PENDENT", label: "Pend" },
+  { value: "ORDERED", label: "Comp" },
+  { value: "DELIVERED", label: "Entreg" },
+  { value: "CANCELLED", label: "Cancel" },
 ];
 
 export function PreorderList({
