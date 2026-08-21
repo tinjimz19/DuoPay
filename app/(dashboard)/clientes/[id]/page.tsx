@@ -137,30 +137,32 @@ export default async function ClienteDetailPage({
             <ClientFormDialog client={client} />
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <a
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-2 text-xs font-medium text-white hover:bg-emerald-700"
             >
               <MessageCircle className="h-4 w-4" />
               WhatsApp
             </a>
-            {reminderUrl && (
+            {reminderUrl ? (
               <a
                 href={reminderUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-11 items-center gap-2 rounded-md bg-amber-500 px-4 text-sm font-medium text-white hover:bg-amber-600"
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-amber-500 px-2 text-xs font-medium text-white hover:bg-amber-600"
               >
                 <HandCoins className="h-4 w-4" />
                 Recordar
               </a>
+            ) : (
+              <span />
             )}
             <a
               href={`tel:${client.phone}`}
-              className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <Phone className="h-4 w-4" />
               Llamar
