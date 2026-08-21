@@ -155,7 +155,7 @@ export default async function ClienteDetailPage({
                 className="inline-flex h-11 items-center gap-2 rounded-md bg-amber-500 px-4 text-sm font-medium text-white hover:bg-amber-600"
               >
                 <HandCoins className="h-4 w-4" />
-                Recordar deuda
+                Recordar
               </a>
             )}
             <a
