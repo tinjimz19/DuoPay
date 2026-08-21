@@ -1,13 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { grantSubscriptionDays } from "@/lib/admin-server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type { ActionResult } from "@/actions/client-actions";
 
 const TRIAL_DAYS = 3;
-const SUBSCRIPTION_DAYS = 30;
 
 const storeActionSchema = z.object({
   profileId: z.string().uuid(),
@@ -50,26 +50,7 @@ export async function activateStore(
   }
   const { supabase } = context;
 
-  const { data: current } = await supabase
-    .from("profiles")
-    .select("subscription_ends_at")
-    .eq("id", parsed.profileId)
-    .maybeSingle();
-
-  const now = new Date();
-  const currentEnd = current?.subscription_ends_at
-    ? new Date(current.subscription_ends_at)
-    : null;
-  const base =
-    currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      status: "ACTIVE",
-      subscription_ends_at: addDays(base, SUBSCRIPTION_DAYS),
-    })
-    .eq("id", parsed.profileId);
+  const { error } = await grantSubscriptionDays(supabase, parsed.profileId);
 
   if (error) {
     return { success: false, error: error.message };
@@ -77,6 +58,7 @@ export async function activateStore(
 
   revalidatePath("/admin");
   revalidatePath("/admin/tiendas");
+  revalidatePath("/admin/pagos");
   return { success: true };
 }
 

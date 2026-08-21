@@ -14,11 +14,28 @@ const items = [
   { href: "/pedidos", label: "Pedidos", icon: Package },
 ];
 
-export function BottomNav() {
+interface BottomNavProps {
+  cutoffLabel?: string | null;
+  cutoffUrgent?: boolean;
+}
+
+export function BottomNav({ cutoffLabel, cutoffUrgent }: BottomNavProps) {
   const pathname = usePathname();
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-slate-800 dark:bg-slate-900 md:hidden">
+      {cutoffLabel && (
+        <p
+          className={cn(
+            "py-1 text-center text-[10px] font-medium",
+            cutoffUrgent
+              ? "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+              : "text-slate-400 dark:text-slate-500"
+          )}
+        >
+          {cutoffLabel}
+        </p>
+      )}
       <div className="mx-auto grid max-w-md grid-cols-5">
         {items.map((item) => {
           const active =

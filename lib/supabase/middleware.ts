@@ -2,6 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database.types";
 
+/**
+ * Los redirects descartan la respuesta original; sin esto, un refresh de
+ * token ocurrido durante el request se perdería y la sesión moriría.
+ */
+function redirectWithSession(
+  url: URL,
+  supabaseResponse: NextResponse
+): NextResponse {
+  const redirectResponse = NextResponse.redirect(url);
+  supabaseResponse.cookies
+    .getAll()
+    .forEach((cookie) => redirectResponse.cookies.set(cookie));
+  return redirectResponse;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -45,7 +60,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    return redirectWithSession(url, supabaseResponse);
   }
 
   if (user) {
@@ -61,7 +76,7 @@ export async function updateSession(request: NextRequest) {
         const url = request.nextUrl.clone();
         url.pathname = "/admin";
         url.search = "";
-        return NextResponse.redirect(url);
+        return redirectWithSession(url, supabaseResponse);
       }
       return supabaseResponse;
     }
@@ -69,7 +84,7 @@ export async function updateSession(request: NextRequest) {
     if (isLoginRoute) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
-      return NextResponse.redirect(url);
+      return redirectWithSession(url, supabaseResponse);
     }
 
     // Sin perfil no se puede evaluar la suscripción: se permite el paso
@@ -87,14 +102,14 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/suscripcion";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirectWithSession(url, supabaseResponse);
     }
 
     if (hasAccess && isSubscriptionRoute) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirectWithSession(url, supabaseResponse);
     }
   }
 

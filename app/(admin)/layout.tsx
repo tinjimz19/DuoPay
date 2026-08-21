@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/actions/auth-actions";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
@@ -39,17 +40,23 @@ export default async function AdminLayout({
     redirect("/");
   }
 
+  const { count: pendingReports } = await supabase
+    .from("payment_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "PENDING");
+
   return (
     <div className="app-shell flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
+        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-4">
           <Link
             href="/admin"
             className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100"
           >
             <Logo />
-            Panel admin
+            <span className="hidden sm:inline">Panel admin</span>
           </Link>
+          <AdminNav pendingCount={pendingReports ?? 0} />
           <div className="flex items-center gap-2">
             <span className="hidden items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 sm:flex dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">
               <ShieldCheck className="h-3.5 w-3.5" />

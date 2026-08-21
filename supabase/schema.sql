@@ -277,3 +277,72 @@ DROP TRIGGER IF EXISTS trg_protect_profile_subscription ON public.profiles;
 CREATE TRIGGER trg_protect_profile_subscription
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.protect_profile_subscription();
+
+
+-- 9. REPORTES DE PAGO DE SUSCRIPCIÓN
+-- La tienda sube su captura y el super admin confirma para activar/renovar.
+DO $$ BEGIN
+  CREATE TYPE public.payment_report_status AS ENUM ('PENDING', 'CONFIRMED', 'REJECTED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.payment_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  amount NUMERIC(10, 2),
+  method TEXT NOT NULL,
+  reference TEXT,
+  proof_path TEXT,
+  notes TEXT,
+  status public.payment_report_status NOT NULL DEFAULT 'PENDING',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.payment_reports ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Tienda crea sus reportes de pago"
+  ON public.payment_reports FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Tienda ve sus reportes de pago"
+  ON public.payment_reports FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Super admin revisa reportes de pago"
+  ON public.payment_reports FOR SELECT
+  USING (public.is_super_admin());
+
+CREATE POLICY "Super admin actualiza reportes de pago"
+  ON public.payment_reports FOR UPDATE
+  USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
+
+CREATE INDEX IF NOT EXISTS idx_payment_reports_user_id ON public.payment_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_reports_status ON public.payment_reports(status);
+
+-- Bucket privado para las capturas
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('payment-proofs', 'payment-proofs', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Cada tienda solo sube/lee dentro de su propia carpeta; el super admin lee todo.
+DROP POLICY IF EXISTS "Tienda sube capturas a su carpeta" ON storage.objects;
+CREATE POLICY "Tienda sube capturas a su carpeta"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS "Tienda ve sus capturas" ON storage.objects;
+CREATE POLICY "Tienda ve sus capturas"
+  ON storage.objects FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'payment-proofs'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS "Super admin ve todas las capturas" ON storage.objects;
+CREATE POLICY "Super admin ve todas las capturas"
+  ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'payment-proofs' AND public.is_super_admin());

@@ -2,6 +2,7 @@ import { CreditCard, LogOut, MessageCircle } from "lucide-react";
 
 import { signOut } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
+import { ReportPaymentDialog } from "@/components/subscription/report-payment-dialog";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileStatus } from "@/types/database.types";
 
@@ -87,6 +88,12 @@ export default async function SuscripcionPage() {
           </Button>
         </a>
       )}
+
+      <ReportPaymentDialog
+        triggerLabel="Ya pagué · Reportar pago"
+        triggerVariant={whatsappHref ? "outline" : "default"}
+        triggerClassName="h-12 w-full text-sm"
+      />
 
       <form action={signOut} className="mt-3">
         <Button type="submit" variant="ghost" className="h-11 w-full text-sm">
