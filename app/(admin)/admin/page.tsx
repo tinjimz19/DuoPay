@@ -10,7 +10,7 @@ const PRICE_PER_STORE = 10;
 
 export default async function AdminPage() {
   const stores = await getStores();
-  const owners = stores.filter((s) => s.role === "owner");
+  const owners = stores.filter((s) => s.role !== "super_admin");
 
   const byStatus = { TRIAL: 0, ACTIVE: 0, EXPIRED: 0, SUSPENDED: 0 } as Record<
     string,

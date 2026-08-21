@@ -24,7 +24,7 @@ export default async function TiendasPage({
   const query = (searchParams?.q ?? "").trim().toLowerCase();
 
   const stores = await getStores();
-  const owners = stores.filter((s) => s.role === "owner");
+  const owners = stores.filter((s) => s.role !== "super_admin");
 
   const filtered = owners.filter((store) => {
     const effective = getEffectiveStatus(store);

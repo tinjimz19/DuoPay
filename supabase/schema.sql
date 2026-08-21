@@ -179,10 +179,17 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS subscription_ends_at TIMESTAMPTZ;
 
+-- Si las columnas ya existían (sin default ni valores), normalizarlas:
+ALTER TABLE public.profiles ALTER COLUMN role SET DEFAULT 'owner';
+ALTER TABLE public.profiles ALTER COLUMN status SET DEFAULT 'TRIAL';
+
+UPDATE public.profiles SET role = 'owner' WHERE role IS NULL;
+UPDATE public.profiles SET status = 'TRIAL' WHERE status IS NULL;
+UPDATE public.profiles SET trial_ends_at = created_at + INTERVAL '3 days' WHERE trial_ends_at IS NULL;
+
 -- Backfill para bases existentes: los negocios actuales quedan activos 30 días.
--- Ejecutar solo una vez en bases creadas antes de esta migración:
---   UPDATE public.profiles SET trial_ends_at = created_at + INTERVAL '3 days' WHERE trial_ends_at IS NULL;
 --   UPDATE public.profiles SET subscription_ends_at = NOW() + INTERVAL '30 days', status = 'ACTIVE' WHERE role = 'owner';
+-- Promover al super admin (ejecutar manualmente con tu id):
 --   UPDATE public.profiles SET role = 'super_admin', status = 'ACTIVE' WHERE id = '<tu-user-id>';
 
 -- El trigger de registro ahora otorga 3 días de prueba.
@@ -252,10 +259,11 @@ CREATE POLICY "Super admin ve pedidos de tiendas"
 
 -- Protección: un owner no puede auto-promoverse ni extender su propia suscripción.
 -- Solo un super admin puede modificar role/status/fechas.
+-- auth.uid() IS NULL = acceso desde Supabase Dashboard (SQL/Table Editor): se permite.
 CREATE OR REPLACE FUNCTION public.protect_profile_subscription()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NOT public.is_super_admin() THEN
+  IF auth.uid() IS NOT NULL AND NOT public.is_super_admin() THEN
     NEW.role := OLD.role;
     NEW.status := OLD.status;
     NEW.trial_ends_at := OLD.trial_ends_at;
