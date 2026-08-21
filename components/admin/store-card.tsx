@@ -20,6 +20,14 @@ import {
 } from "@/actions/admin-actions";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -35,6 +43,7 @@ export function StoreCard({ store }: { store: StoreWithStats }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
   const [confirmingSuspend, setConfirmingSuspend] = React.useState(false);
+  const [renewOpen, setRenewOpen] = React.useState(false);
 
   const effective = getEffectiveStatus(store);
   const isActive = effective === "ACTIVE";
@@ -44,6 +53,15 @@ export function StoreCard({ store }: { store: StoreWithStats }) {
       : isActive
         ? daysLeft(store.subscription_ends_at)
         : null;
+
+  // Nueva fecha de vencimiento si se renueva: desde el fin actual si aún
+  // está activa, o desde hoy si ya venció.
+  const renewBase =
+    isActive && store.subscription_ends_at
+      ? new Date(store.subscription_ends_at)
+      : new Date();
+  const newEndDate = new Date(renewBase);
+  newEndDate.setDate(newEndDate.getDate() + 30);
 
   function runAction(
     action: (input: { profileId: string }) => Promise<{ success: boolean; error?: string }>,
@@ -134,12 +152,7 @@ export function StoreCard({ store }: { store: StoreWithStats }) {
           size="sm"
           className="h-9 flex-1 text-xs"
           disabled={pending}
-          onClick={() =>
-            runAction(
-              activateStore,
-              isActive ? "Suscripción renovada +30 días" : "Tienda activada 30 días"
-            )
-          }
+          onClick={() => setRenewOpen(true)}
         >
           {pending && <Loader2 className="animate-spin" />}
           {isActive ? "Renovar +30 días" : "Activar 30 días · $10"}
@@ -187,6 +200,68 @@ export function StoreCard({ store }: { store: StoreWithStats }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <Dialog open={renewOpen} onOpenChange={setRenewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isActive ? "Renovar suscripción" : "Activar suscripción"}
+            </DialogTitle>
+            <DialogDescription>
+              {store.business_name || store.full_name || "Sin nombre"} ·{" "}
+              {PROFILE_STATUS_LABELS[effective]}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-800/60">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Cobro</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                $10.00
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Duración</span>
+              <span className="font-medium text-slate-900 dark:text-slate-100">
+                30 días
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Nueva fecha límite</span>
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                {formatDate(newEndDate.toISOString())}
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11"
+              disabled={pending}
+              onClick={() => setRenewOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="h-11"
+              disabled={pending}
+              onClick={() => {
+                setRenewOpen(false);
+                runAction(
+                  activateStore,
+                  isActive ? "Suscripción renovada +30 días" : "Tienda activada 30 días"
+                );
+              }}
+            >
+              {pending && <Loader2 className="animate-spin" />}
+              Confirmar {isActive ? "renovación" : "activación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
