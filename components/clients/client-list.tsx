@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronRight, MessageCircle, Search, UserRound } from "lucide-react";
+import {
+  ChevronRight,
+  HandCoins,
+  MessageCircle,
+  Search,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -8,6 +14,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, normalizePhone } from "@/lib/format";
+import {
+  buildTotalDebtReminderMessage,
+  whatsappReminderUrl,
+} from "@/lib/reminders";
 import { cn } from "@/lib/utils";
 
 export interface ClientWithBalance {
@@ -19,8 +29,10 @@ export interface ClientWithBalance {
 
 export function ClientList({
   clients,
+  businessName,
 }: {
   clients: ClientWithBalance[];
+  businessName?: string | null;
 }) {
   const [query, setQuery] = React.useState("");
 
@@ -82,6 +94,25 @@ export function ClientList({
                   </div>
                 </Link>
                 <div className="flex shrink-0 items-center gap-2">
+                  {client.balance > 0 && (
+                    <a
+                      href={whatsappReminderUrl(
+                        client.phone,
+                        buildTotalDebtReminderMessage({
+                          businessName,
+                          clientName: client.name,
+                          total: client.balance,
+                        })
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Recordar deuda a ${client.name}`}
+                      title="Recordar deuda por WhatsApp"
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-white transition-colors hover:bg-amber-600"
+                    >
+                      <HandCoins className="h-4 w-4" />
+                    </a>
+                  )}
                   <a
                     href={`https://wa.me/${normalizePhone(client.phone)}`}
                     target="_blank"

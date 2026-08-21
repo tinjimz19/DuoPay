@@ -116,6 +116,106 @@ export async function deleteClient(id: string): Promise<ActionResult> {
     return { success: false, error: "No autorizado" };
   }
 
+  const now = new Date().toISOString();
+
+  // Papelera: cliente + sus ventas + los abonos de esas ventas.
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id")
+    .eq("client_id", id)
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
+
+  const saleIds = (sales ?? []).map((s) => s.id);
+
+  if (saleIds.length > 0) {
+    await supabase
+      .from("payments")
+      .update({ deleted_at: now })
+      .in("sale_id", saleIds)
+      .is("deleted_at", null);
+    await supabase
+      .from("sales")
+      .update({ deleted_at: now })
+      .in("id", saleIds);
+  }
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ deleted_at: now })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/clientes");
+  revalidatePath("/ventas");
+  revalidatePath("/papelera");
+  return { success: true };
+}
+
+export async function restoreClient(id: string): Promise<ActionResult> {
+  const supabase = createSupabaseClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id")
+    .eq("client_id", id)
+    .eq("user_id", user.id)
+    .not("deleted_at", "is", null);
+
+  const saleIds = (sales ?? []).map((s) => s.id);
+
+  if (saleIds.length > 0) {
+    await supabase
+      .from("payments")
+      .update({ deleted_at: null })
+      .in("sale_id", saleIds);
+    await supabase.from("sales").update({ deleted_at: null }).in("id", saleIds);
+  }
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ deleted_at: null })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/clientes");
+  revalidatePath("/ventas");
+  revalidatePath("/papelera");
+  return { success: true };
+}
+
+export async function purgeClient(id: string): Promise<ActionResult> {
+  const supabase = createSupabaseClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  // Borrado definitivo: la FK en cascada elimina ventas y abonos.
   const { error } = await supabase
     .from("clients")
     .delete()
@@ -126,7 +226,6 @@ export async function deleteClient(id: string): Promise<ActionResult> {
     return { success: false, error: error.message };
   }
 
-  revalidatePath("/");
-  revalidatePath("/clientes");
+  revalidatePath("/papelera");
   return { success: true };
 }

@@ -17,6 +17,7 @@ export default async function NuevaVentaPage() {
   const { data: clients } = await supabase
     .from("clients")
     .select("id, name")
+    .is("deleted_at", null)
     .order("name");
 
   return (

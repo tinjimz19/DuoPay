@@ -27,8 +27,11 @@ export async function getStores(): Promise<StoreWithStats[]> {
           "id, full_name, business_name, role, status, trial_ends_at, subscription_ends_at, created_at"
         )
         .order("created_at", { ascending: false }),
-      supabase.from("clients").select("id, user_id"),
-      supabase.from("sales").select("user_id, total_amount, amount_paid, status"),
+      supabase.from("clients").select("id, user_id").is("deleted_at", null),
+      supabase
+        .from("sales")
+        .select("user_id, total_amount, amount_paid, status")
+        .is("deleted_at", null),
       supabase.rpc("store_emails"),
     ]);
 

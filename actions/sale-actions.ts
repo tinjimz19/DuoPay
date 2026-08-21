@@ -100,6 +100,7 @@ export async function recordPayment(input: z.infer<typeof recordPaymentSchema>) 
     .select("id, client_id, total_amount, amount_paid, status")
     .eq("id", parsed.saleId)
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .single();
 
   if (saleError || !sale) {
@@ -169,16 +170,19 @@ export async function deleteSale(id: string) {
     return { success: false, error: "No autorizado" };
   }
 
-  const { data: sale } = await supabase
-    .from("sales")
-    .select("client_id")
-    .eq("id", id)
+  const now = new Date().toISOString();
+
+  // Papelera: venta + sus abonos.
+  await supabase
+    .from("payments")
+    .update({ deleted_at: now })
+    .eq("sale_id", id)
     .eq("user_id", user.id)
-    .single();
+    .is("deleted_at", null);
 
   const { error } = await supabase
     .from("sales")
-    .delete()
+    .update({ deleted_at: now })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -189,9 +193,78 @@ export async function deleteSale(id: string) {
   revalidatePath("/");
   revalidatePath("/ventas");
   revalidatePath("/clientes");
-  if (sale) {
-    revalidatePath(`/clientes/${sale.client_id}`);
+  revalidatePath("/papelera");
+  return { success: true };
+}
+
+export async function restoreSale(id: string) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
   }
 
+  const { data: sale } = await supabase
+    .from("sales")
+    .select("client_id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  await supabase
+    .from("payments")
+    .update({ deleted_at: null })
+    .eq("sale_id", id)
+    .eq("user_id", user.id);
+
+  const { error } = await supabase
+    .from("sales")
+    .update({ deleted_at: null })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/ventas");
+  revalidatePath("/clientes");
+  revalidatePath("/papelera");
+  if (sale?.client_id) {
+    revalidatePath(`/clientes/${sale.client_id}`);
+  }
+  return { success: true };
+}
+
+export async function purgeSale(id: string) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  // Borrado definitivo: la FK en cascada elimina los abonos.
+  const { error } = await supabase
+    .from("sales")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/papelera");
   return { success: true };
 }

@@ -85,23 +85,28 @@ export default async function ReportesPage({
   ] = await Promise.all([
     supabase
       .from("payments")
-      .select("amount, created_at, sales(category)")
+      .select("amount, created_at, sales!inner(category)")
+      .is("deleted_at", null)
       .gte("created_at", desdeIso)
       .lte("created_at", hastaIso),
     supabase
       .from("sales")
       .select("total_amount, amount_paid, status")
+      .is("deleted_at", null)
       .neq("status", "COMPLETED"),
     supabase
       .from("sales")
       .select("status, payments(created_at)")
+      .is("deleted_at", null)
       .eq("status", "COMPLETED"),
     supabase
       .from("sales")
-      .select("total_amount, amount_paid, status, clients(id, name)"),
+      .select("total_amount, amount_paid, status, clients(id, name)")
+      .is("deleted_at", null),
     supabase
       .from("clients")
       .select("id")
+      .is("deleted_at", null)
       .gte("created_at", desdeIso)
       .lte("created_at", hastaIso),
   ]);

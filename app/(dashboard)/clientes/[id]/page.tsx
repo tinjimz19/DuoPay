@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, formatDateTime, normalizePhone } from "@/lib/format";
+import {
+  buildDebtReminderMessage,
+  whatsappReminderUrl,
+} from "@/lib/reminders";
 import type { ProductCategory, PreorderStatus } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +41,13 @@ export default async function ClienteDetailPage({
 }) {
   const supabase = createClient();
 
-  const [{ data: client }, { data: sales }, { data: preorders }] =
+  const [{ data: client }, { data: sales }, { data: preorders }, { data: profile }] =
     await Promise.all([
       supabase
         .from("clients")
         .select("id, name, phone, notes, created_at")
         .eq("id", params.id)
+        .is("deleted_at", null)
         .maybeSingle(),
       supabase
         .from("sales")
@@ -50,12 +55,15 @@ export default async function ClienteDetailPage({
           "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, payments(id, amount, payment_number, notes, created_at)"
         )
         .eq("client_id", params.id)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("preorders")
         .select("*")
         .eq("client_id", params.id)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false }),
+      supabase.from("profiles").select("business_name").maybeSingle(),
     ]);
 
   if (!client) {
@@ -81,6 +89,24 @@ export default async function ClienteDetailPage({
     );
 
   const whatsappUrl = `https://wa.me/${normalizePhone(client.phone)}`;
+
+  const openSales = saleList
+    .filter((s) => s.status !== "COMPLETED")
+    .map((s) => ({
+      description: s.item_description,
+      remaining: Number(s.total_amount) - Number(s.amount_paid),
+    }));
+  const reminderUrl =
+    remainingTotal > 0 && openSales.length > 0
+      ? whatsappReminderUrl(
+          client.phone,
+          buildDebtReminderMessage({
+            businessName: profile?.business_name ?? null,
+            clientName: client.name,
+            items: openSales,
+          })
+        )
+      : null;
 
   const preorderList = (preorders ?? []) as unknown as {
     id: string;
@@ -121,6 +147,17 @@ export default async function ClienteDetailPage({
               <MessageCircle className="h-4 w-4" />
               WhatsApp
             </a>
+            {reminderUrl && (
+              <a
+                href={reminderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center gap-2 rounded-md bg-amber-500 px-4 text-sm font-medium text-white hover:bg-amber-600"
+              >
+                <HandCoins className="h-4 w-4" />
+                Recordar deuda
+              </a>
+            )}
             <a
               href={`tel:${client.phone}`}
               className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Home, Package, ShoppingBag, Users } from "lucide-react";
+import { BarChart3, Home, Package, ShoppingBag, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -13,6 +13,7 @@ const items = [
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/pedidos", label: "Pedidos", icon: Package },
+  { href: "/papelera", label: "Papelera", icon: Trash2 },
 ];
 
 export function Sidebar() {

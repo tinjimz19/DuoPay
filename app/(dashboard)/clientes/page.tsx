@@ -7,15 +7,19 @@ export const dynamic = "force-dynamic";
 export default async function ClientesPage() {
   const supabase = createClient();
 
-  const [{ data: clients }, { data: sales }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("id, name, phone, notes")
-      .order("name"),
-    supabase
-      .from("sales")
-      .select("client_id, total_amount, amount_paid, status"),
-  ]);
+  const [{ data: clients }, { data: sales }, { data: profile }] =
+    await Promise.all([
+      supabase
+        .from("clients")
+        .select("id, name, phone, notes")
+        .is("deleted_at", null)
+        .order("name"),
+      supabase
+        .from("sales")
+        .select("client_id, total_amount, amount_paid, status")
+        .is("deleted_at", null),
+      supabase.from("profiles").select("business_name").maybeSingle(),
+    ]);
 
   const balances = new Map<string, number>();
   for (const sale of sales ?? []) {
@@ -46,7 +50,7 @@ export default async function ClientesPage() {
         </div>
         <ClientFormDialog />
       </div>
-      <ClientList clients={enriched} />
+      <ClientList clients={enriched} businessName={profile?.business_name ?? null} />
     </div>
   );
 }

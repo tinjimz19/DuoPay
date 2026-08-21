@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, Trash2, User as UserIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -97,9 +98,18 @@ export function AccountSheet({
           </Button>
         </form>
 
+        <Link
+          href="/papelera"
+          onClick={() => setOpen(false)}
+          className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          <Trash2 className="h-4 w-4" />
+          Papelera
+        </Link>
+
         <Button
           variant="outline"
-          className="mt-4 h-11 w-full text-slate-600 dark:text-slate-300"
+          className="mt-2 h-11 w-full text-slate-600 dark:text-slate-300"
           onClick={() => startTransition(() => signOut())}
         >
           <LogOut className="h-4 w-4" />

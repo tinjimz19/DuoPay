@@ -35,15 +35,18 @@ export default async function DashboardPage() {
         .select(
           "id, item_description, total_amount, amount_paid, status, created_at, clients(name)"
         )
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(6),
       supabase
         .from("payments")
         .select("amount")
+        .is("deleted_at", null)
         .gte("created_at", startOfMonth.toISOString()),
       supabase
         .from("preorders")
         .select("id")
+        .is("deleted_at", null)
         .eq("status", "PENDENT"),
     ]);
 

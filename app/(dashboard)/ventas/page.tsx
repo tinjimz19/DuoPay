@@ -11,12 +11,16 @@ export const dynamic = "force-dynamic";
 export default async function VentasPage() {
   const supabase = createClient();
 
-  const { data: sales } = await supabase
-    .from("sales")
-    .select(
-      "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, clients(name)"
-    )
-    .order("created_at", { ascending: false });
+  const [{ data: sales }, { data: profile }] = await Promise.all([
+    supabase
+      .from("sales")
+      .select(
+        "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, clients(name, phone)"
+      )
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+    supabase.from("profiles").select("business_name").maybeSingle(),
+  ]);
 
   const mapped: SaleCardData[] = (sales ?? []).map((s) => ({
     id: s.id,
@@ -31,6 +35,8 @@ export default async function VentasPage() {
     created_at: s.created_at,
     client_name:
       (s.clients as unknown as { name: string } | null)?.name ?? "Cliente",
+    client_phone:
+      (s.clients as unknown as { phone: string } | null)?.phone ?? null,
   }));
 
   return (
@@ -51,7 +57,10 @@ export default async function VentasPage() {
           </Link>
         </Button>
       </div>
-      <SaleList sales={mapped} />
+      <SaleList
+        sales={mapped}
+        businessName={profile?.business_name ?? null}
+      />
     </div>
   );
 }

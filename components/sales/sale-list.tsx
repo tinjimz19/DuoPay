@@ -15,7 +15,13 @@ const FILTERS = [
   { value: "COMPLETED", label: "Saldados" },
 ] as const;
 
-export function SaleList({ sales }: { sales: SaleCardData[] }) {
+export function SaleList({
+  sales,
+  businessName,
+}: {
+  sales: SaleCardData[];
+  businessName?: string | null;
+}) {
   const [filter, setFilter] = React.useState<(typeof FILTERS)[number]["value"]>("all");
   const [query, setQuery] = React.useState("");
 
@@ -66,7 +72,7 @@ export function SaleList({ sales }: { sales: SaleCardData[] }) {
       ) : (
         <div className="space-y-2">
           {filtered.map((sale) => (
-            <SaleCard key={sale.id} sale={sale} />
+            <SaleCard key={sale.id} sale={sale} businessName={businessName} />
           ))}
         </div>
       )}

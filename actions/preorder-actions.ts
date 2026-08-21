@@ -165,7 +165,7 @@ export async function deletePreorder(id: string) {
 
   const { error } = await supabase
     .from("preorders")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -175,5 +175,60 @@ export async function deletePreorder(id: string) {
 
   revalidatePath("/");
   revalidatePath("/pedidos");
+  revalidatePath("/papelera");
+  return { success: true };
+}
+
+export async function restorePreorder(id: string) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const { error } = await supabase
+    .from("preorders")
+    .update({ deleted_at: null })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/pedidos");
+  revalidatePath("/papelera");
+  return { success: true };
+}
+
+export async function purgePreorder(id: string) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const { error } = await supabase
+    .from("preorders")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/papelera");
   return { success: true };
 }

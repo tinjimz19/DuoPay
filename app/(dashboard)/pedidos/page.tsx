@@ -18,8 +18,13 @@ export default async function PedidosPage({
       .select(
         "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, clients(name)"
       )
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
-    supabase.from("clients").select("id, name").order("name"),
+    supabase
+      .from("clients")
+      .select("id, name")
+      .is("deleted_at", null)
+      .order("name"),
   ]);
 
   const mapped: PreorderCardData[] = (preorders ?? []).map((p) => ({

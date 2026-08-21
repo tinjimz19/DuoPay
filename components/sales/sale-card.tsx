@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, HandCoins, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -28,6 +28,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { formatBs, formatCurrency } from "@/lib/format";
+import {
+  buildDebtReminderMessage,
+  whatsappReminderUrl,
+} from "@/lib/reminders";
 import type { ProductCategory, SaleStatus } from "@/types/database.types";
 
 export interface PaymentRecord {
@@ -50,10 +54,17 @@ export interface SaleCardData {
   notes: string | null;
   created_at: string;
   client_name: string;
+  client_phone?: string | null;
   payments?: PaymentRecord[];
 }
 
-export function SaleCard({ sale }: { sale: SaleCardData }) {
+export function SaleCard({
+  sale,
+  businessName,
+}: {
+  sale: SaleCardData;
+  businessName?: string | null;
+}) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
@@ -298,6 +309,30 @@ export function SaleCard({ sale }: { sale: SaleCardData }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {sale.client_phone && remaining > 0 && (
+              <DropdownMenuItem asChild>
+                <a
+                  href={whatsappReminderUrl(
+                    sale.client_phone,
+                    buildDebtReminderMessage({
+                      businessName,
+                      clientName: sale.client_name,
+                      items: [
+                        {
+                          description: sale.item_description,
+                          remaining,
+                        },
+                      ],
+                    })
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <HandCoins className="h-4 w-4" />
+                  Recordar por WhatsApp
+                </a>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
               onClick={handleDelete}

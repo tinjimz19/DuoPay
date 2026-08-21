@@ -346,3 +346,16 @@ DROP POLICY IF EXISTS "Super admin ve todas las capturas" ON storage.objects;
 CREATE POLICY "Super admin ve todas las capturas"
   ON storage.objects FOR SELECT TO authenticated
   USING (bucket_id = 'payment-proofs' AND public.is_super_admin());
+
+
+-- 10. PAPELERA (SOFT DELETE)
+-- Borrar mueve a papelera (deleted_at); restaurar lo devuelve; purgar elimina de verdad.
+ALTER TABLE public.clients   ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.sales     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.payments  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.preorders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_clients_deleted_at   ON public.clients(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_sales_deleted_at     ON public.sales(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payments_deleted_at  ON public.payments(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_preorders_deleted_at ON public.preorders(user_id) WHERE deleted_at IS NULL;
