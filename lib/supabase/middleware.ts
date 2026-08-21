@@ -38,6 +38,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
+  const isSubscriptionRoute = request.nextUrl.pathname.startsWith("/suscripcion");
 
   if (!user && !isLoginRoute) {
     const url = request.nextUrl.clone();
@@ -50,6 +51,40 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
+  }
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, status, trial_ends_at, subscription_ends_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    // Sin perfil no se puede evaluar la suscripción: se permite el paso
+    // para no bloquear cuentas durante una migración.
+    const hasAccess =
+      !profile ||
+      profile.role === "super_admin" ||
+      (profile.status === "TRIAL" &&
+        !!profile.trial_ends_at &&
+        new Date(profile.trial_ends_at).getTime() > Date.now()) ||
+      (profile.status === "ACTIVE" &&
+        !!profile.subscription_ends_at &&
+        new Date(profile.subscription_ends_at).getTime() > Date.now());
+
+    if (!hasAccess && !isSubscriptionRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/suscripcion";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+
+    if (hasAccess && isSubscriptionRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

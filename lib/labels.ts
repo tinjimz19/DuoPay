@@ -1,4 +1,10 @@
-import type { ProductCategory, PreorderStatus, SaleStatus } from "@/types/database.types";
+import type {
+  PreorderStatus,
+  ProductCategory,
+  ProfileRole,
+  ProfileStatus,
+  SaleStatus,
+} from "@/types/database.types";
 
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   ROPA: "Ropa",
@@ -54,3 +60,26 @@ export const PREORDER_STATUS_OPTIONS: {
   { value: "DELIVERED", label: "Entregado" },
   { value: "CANCELLED", label: "Cancelado" },
 ];
+
+export const PROFILE_STATUS_LABELS: Record<ProfileStatus, string> = {
+  TRIAL: "En prueba",
+  ACTIVE: "Activa",
+  SUSPENDED: "Suspendida",
+  EXPIRED: "Vencida",
+};
+
+export const PROFILE_STATUS_STYLES: Record<ProfileStatus, string> = {
+  TRIAL:
+    "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800",
+  ACTIVE:
+    "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800",
+  SUSPENDED:
+    "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800",
+  EXPIRED:
+    "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800",
+};
+
+export const PROFILE_ROLE_LABELS: Record<ProfileRole, string> = {
+  owner: "Tienda",
+  super_admin: "Super admin",
+};

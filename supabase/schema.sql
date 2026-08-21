@@ -159,3 +159,113 @@ CREATE INDEX IF NOT EXISTS idx_preorders_user_id ON public.preorders(user_id);
 -- En una base ya creada, completa los teléfonos que faltan y marca la columna NOT NULL:
 --   UPDATE public.clients SET phone = '0000000' WHERE phone IS NULL OR phone = '';
 --   ALTER TABLE public.clients ALTER COLUMN phone SET NOT NULL;
+
+
+-- 7. SUSCRIPCIONES Y ROLES DE TIENDA
+-- role:    owner (negocio) | super_admin (dueño de DuoPay)
+-- status:  TRIAL (prueba) | ACTIVE (pagado) | SUSPENDED | EXPIRED
+
+DO $$ BEGIN
+  CREATE TYPE public.profile_role AS ENUM ('owner', 'super_admin');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.profile_status AS ENUM ('TRIAL', 'ACTIVE', 'SUSPENDED', 'EXPIRED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS role public.profile_role NOT NULL DEFAULT 'owner',
+  ADD COLUMN IF NOT EXISTS status public.profile_status NOT NULL DEFAULT 'TRIAL',
+  ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS subscription_ends_at TIMESTAMPTZ;
+
+-- Backfill para bases existentes: los negocios actuales quedan activos 30 días.
+-- Ejecutar solo una vez en bases creadas antes de esta migración:
+--   UPDATE public.profiles SET trial_ends_at = created_at + INTERVAL '3 days' WHERE trial_ends_at IS NULL;
+--   UPDATE public.profiles SET subscription_ends_at = NOW() + INTERVAL '30 days', status = 'ACTIVE' WHERE role = 'owner';
+--   UPDATE public.profiles SET role = 'super_admin', status = 'ACTIVE' WHERE id = '<tu-user-id>';
+
+-- El trigger de registro ahora otorga 3 días de prueba.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, trial_ends_at)
+  VALUES (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    NOW() + INTERVAL '3 days'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Helper: true si el usuario actual es super admin (bypasea RLS).
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'super_admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- Emails de las cuentas (viven en auth.users, no accesibles con anon key).
+-- Devuelve filas solo si quien consulta es super admin.
+CREATE OR REPLACE FUNCTION public.store_emails()
+RETURNS TABLE (id UUID, email TEXT)
+LANGUAGE sql SECURITY DEFINER STABLE
+SET search_path = public
+AS $$
+  SELECT u.id, u.email
+  FROM auth.users u
+  WHERE public.is_super_admin();
+$$;
+
+REVOKE ALL ON FUNCTION public.store_emails() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.store_emails() TO authenticated;
+
+-- Políticas de lectura/gestión para el super admin.
+DROP POLICY IF EXISTS "Super admin gestiona tiendas" ON public.profiles;
+CREATE POLICY "Super admin gestiona tiendas"
+  ON public.profiles FOR SELECT
+  USING (public.is_super_admin());
+
+DROP POLICY IF EXISTS "Super admin actualiza tiendas" ON public.profiles;
+CREATE POLICY "Super admin actualiza tiendas"
+  ON public.profiles FOR UPDATE
+  USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
+
+-- Lectura de métricas de uso por tienda (solo lectura, para el panel admin).
+CREATE POLICY "Super admin ve clientes de tiendas"
+  ON public.clients FOR SELECT USING (public.is_super_admin());
+CREATE POLICY "Super admin ve ventas de tiendas"
+  ON public.sales FOR SELECT USING (public.is_super_admin());
+CREATE POLICY "Super admin ve pagos de tiendas"
+  ON public.payments FOR SELECT USING (public.is_super_admin());
+CREATE POLICY "Super admin ve pedidos de tiendas"
+  ON public.preorders FOR SELECT USING (public.is_super_admin());
+
+-- Protección: un owner no puede auto-promoverse ni extender su propia suscripción.
+-- Solo un super admin puede modificar role/status/fechas.
+CREATE OR REPLACE FUNCTION public.protect_profile_subscription()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NOT public.is_super_admin() THEN
+    NEW.role := OLD.role;
+    NEW.status := OLD.status;
+    NEW.trial_ends_at := OLD.trial_ends_at;
+    NEW.subscription_ends_at := OLD.subscription_ends_at;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_protect_profile_subscription ON public.profiles;
+CREATE TRIGGER trg_protect_profile_subscription
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_profile_subscription();

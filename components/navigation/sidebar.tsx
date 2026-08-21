@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Home, Package, ShoppingBag, Users } from "lucide-react";
+import { BarChart3, Home, Package, ShieldCheck, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -15,8 +15,12 @@ const items = [
   { href: "/pedidos", label: "Pedidos", icon: Package },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+
+  const navItems = isAdmin
+    ? [...items, { href: "/admin", label: "Admin", icon: ShieldCheck }]
+    : items;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">
@@ -30,7 +34,7 @@ export function Sidebar() {
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
-        {items.map((item) => {
+        {navItems.map((item) => {
           const active =
             item.href === "/"
               ? pathname === "/"

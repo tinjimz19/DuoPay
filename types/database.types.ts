@@ -9,6 +9,8 @@ export type Json =
 export type ProductCategory = "ROPA" | "CALZADO" | "PERFUME" | "OTRO";
 export type SaleStatus = "PENDING" | "PARTIAL" | "COMPLETED";
 export type PreorderStatus = "PENDENT" | "ORDERED" | "DELIVERED" | "CANCELLED";
+export type ProfileRole = "owner" | "super_admin";
+export type ProfileStatus = "TRIAL" | "ACTIVE" | "SUSPENDED" | "EXPIRED";
 
 export interface Database {
   public: {
@@ -18,18 +20,30 @@ export interface Database {
           id: string;
           full_name: string | null;
           business_name: string | null;
+          role: ProfileRole;
+          status: ProfileStatus;
+          trial_ends_at: string | null;
+          subscription_ends_at: string | null;
           created_at: string;
         };
         Insert: {
           id: string;
           full_name?: string | null;
           business_name?: string | null;
+          role?: ProfileRole;
+          status?: ProfileStatus;
+          trial_ends_at?: string | null;
+          subscription_ends_at?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           full_name?: string | null;
           business_name?: string | null;
+          role?: ProfileRole;
+          status?: ProfileStatus;
+          trial_ends_at?: string | null;
+          subscription_ends_at?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -237,12 +251,20 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      store_emails: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          email: string | null;
+        }[];
+      };
     };
     Enums: {
       product_category: ProductCategory;
       sale_status: SaleStatus;
       preorder_status: PreorderStatus;
+      profile_role: ProfileRole;
+      profile_status: ProfileStatus;
     };
     CompositeTypes: {
       [_ in never]: never;
