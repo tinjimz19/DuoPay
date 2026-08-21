@@ -30,13 +30,13 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, business_name, role")
+    .select("full_name, business_name")
     .eq("id", user.id)
     .maybeSingle();
 
   return (
     <div className="app-shell flex flex-col bg-slate-50 dark:bg-slate-950">
-      <Sidebar isAdmin={profile?.role === "super_admin"} />
+      <Sidebar />
       <div className="flex flex-1 flex-col md:pl-64">
         <Header
           email={user.email ?? ""}

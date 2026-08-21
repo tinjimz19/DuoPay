@@ -39,17 +39,12 @@ export async function updateSession(request: NextRequest) {
 
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   const isSubscriptionRoute = request.nextUrl.pathname.startsWith("/suscripcion");
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
 
   if (!user && !isLoginRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isLoginRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
@@ -60,11 +55,27 @@ export async function updateSession(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
+    // El super admin solo opera el panel: /admin es su único acceso.
+    if (profile?.role === "super_admin") {
+      if (!isAdminRoute || isSubscriptionRoute) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+      return supabaseResponse;
+    }
+
+    if (isLoginRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+
     // Sin perfil no se puede evaluar la suscripción: se permite el paso
     // para no bloquear cuentas durante una migración.
     const hasAccess =
       !profile ||
-      profile.role === "super_admin" ||
       (profile.status === "TRIAL" &&
         !!profile.trial_ends_at &&
         new Date(profile.trial_ends_at).getTime() > Date.now()) ||

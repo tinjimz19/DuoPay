@@ -1,8 +1,10 @@
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { signOut } from "@/actions/auth-actions";
 import { Logo } from "@/components/logo";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
@@ -53,13 +55,16 @@ export default async function AdminLayout({
               <ShieldCheck className="h-3.5 w-3.5" />
               Super admin
             </span>
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Mi tienda
-            </Link>
+            <form action={signOut}>
+              <Button
+                type="submit"
+                variant="ghost"
+                className="flex items-center gap-1.5 px-3 text-sm font-medium text-slate-600 dark:text-slate-400"
+              >
+                <LogOut className="h-4 w-4" />
+                Salir
+              </Button>
+            </form>
           </div>
         </div>
       </header>
