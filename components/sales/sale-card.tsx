@@ -21,6 +21,7 @@ import {
 } from "@/actions/sale-actions";
 import { getEuroRate } from "@/actions/rates";
 import { CategoryBadge } from "@/components/category-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SaleStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,7 +103,7 @@ function PaymentRow({
 }) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(String(payment.amount));
-  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const [confirming, setConfirming] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
 
   const parsed = parseAmount(draft);
@@ -130,16 +131,11 @@ function PaymentRow({
   }
 
   function remove() {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true);
-      setTimeout(() => setConfirmingDelete(false), 2500);
-      return;
-    }
-    setConfirmingDelete(false);
     startTransition(async () => {
       const res = await deletePayment(payment.id);
       if (res.success) {
         toast.success("Abono eliminado · está en la papelera");
+        setConfirming(false);
         onChanged();
       } else {
         toast.error(res.error);
@@ -225,15 +221,11 @@ function PaymentRow({
         type="button"
         size="icon"
         variant="ghost"
-        className={
-          confirmingDelete
-            ? "h-8 w-8 shrink-0 text-destructive"
-            : "h-8 w-8 shrink-0 text-slate-400 hover:text-destructive"
-        }
+        className="h-8 w-8 shrink-0 text-slate-400 hover:text-destructive"
         disabled={busy}
-        onClick={remove}
-        aria-label={confirmingDelete ? "Confirmar borrado" : "Eliminar abono"}
-        title={confirmingDelete ? "Toca otra vez para confirmar" : "Eliminar"}
+        onClick={() => setConfirming(true)}
+        aria-label="Eliminar abono"
+        title="Eliminar abono"
       >
         {pending ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -241,6 +233,22 @@ function PaymentRow({
           <Trash2 className="h-3.5 w-3.5" />
         )}
       </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="¿Eliminar este abono?"
+        description={
+          <>
+            Se quitan {formatCurrency(Number(payment.amount))} de lo abonado y
+            el saldo de la venta vuelve a subir. Queda en la papelera por si te
+            arrepientes.
+          </>
+        }
+        confirmLabel="Eliminar abono"
+        pending={pending}
+        onConfirm={remove}
+      />
     </div>
   );
 }
@@ -254,6 +262,7 @@ export function SaleCard({
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [customAmount, setCustomAmount] = React.useState("");
@@ -289,15 +298,10 @@ export function SaleCard({
       : null;
 
   function handleDelete() {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true);
-      setTimeout(() => setConfirmingDelete(false), 2500);
-      return;
-    }
     startTransition(async () => {
       const res = await deleteSale(sale.id);
       if (res.success) {
-        toast.success("Venta eliminada");
+        toast.success("Venta eliminada · está en la papelera");
         setConfirmingDelete(false);
         router.refresh();
       } else {
@@ -529,7 +533,7 @@ export function SaleCard({
       </Dialog>
 
       <div className="absolute right-3 top-3">
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -567,15 +571,45 @@ export function SaleCard({
             )}
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onClick={handleDelete}
               disabled={pending}
+              // Radix cierra el menú al elegir. Lo cerramos nosotros y
+              // abrimos el diálogo, o el confirm se perdería con el menú.
+              onSelect={(event) => {
+                event.preventDefault();
+                setMenuOpen(false);
+                setConfirmingDelete(true);
+              }}
             >
               <Trash2 className="h-4 w-4" />
-              {confirmingDelete ? "¿Confirmar eliminación?" : "Eliminar venta"}
+              Eliminar venta
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="¿Eliminar esta venta?"
+        description={
+          <>
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {sale.item_description}
+            </span>{" "}
+            de {sale.client_name}
+            {payments.length > 0 && (
+              <>
+                , con sus {payments.length} abono
+                {payments.length === 1 ? "" : "s"} de {formatCurrency(paid)}
+              </>
+            )}
+            . Va a la papelera y se puede restaurar.
+          </>
+        }
+        confirmLabel="Eliminar venta"
+        pending={pending}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

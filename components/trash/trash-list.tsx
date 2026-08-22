@@ -19,6 +19,7 @@ import {
   purgePreorder,
   restorePreorder,
 } from "@/actions/preorder-actions";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -78,11 +79,14 @@ function useTrashAction() {
 
 function TrashButton({
   label,
+  what,
   onRestore,
   onPurge,
   pending,
 }: {
   label: string;
+  /** Qué se va a borrar, para nombrarlo en la confirmación. */
+  what: string;
   onRestore: () => void;
   onPurge: () => void;
   pending: boolean;
@@ -106,19 +110,32 @@ function TrashButton({
         variant="outline"
         className="h-9 text-xs text-destructive hover:text-destructive"
         disabled={pending}
-        onClick={() => {
-          if (!confirming) {
-            setConfirming(true);
-            setTimeout(() => setConfirming(false), 2500);
-            return;
-          }
+        onClick={() => setConfirming(true)}
+      >
+        <Trash2 />
+        {label}
+      </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="¿Eliminar definitivamente?"
+        description={
+          <>
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {what}
+            </span>{" "}
+            se borra para siempre, junto con todo lo que dependa de ello. Esto
+            no se puede deshacer.
+          </>
+        }
+        confirmLabel="Sí, eliminar para siempre"
+        pending={pending}
+        onConfirm={() => {
           setConfirming(false);
           onPurge();
         }}
-      >
-        <Trash2 />
-        {confirming ? "¿Confirmar?" : label}
-      </Button>
+      />
     </div>
   );
 }
@@ -181,6 +198,7 @@ export function TrashList({
                 </div>
                 <TrashButton
                   label="Eliminar"
+                  what={`El cliente ${client.name}`}
                   pending={clientAction.pending && clientAction.pendingId === client.id}
                   onRestore={() =>
                     clientAction.run(client.id, restoreClient, "Cliente restaurado")
@@ -224,6 +242,7 @@ export function TrashList({
                 </div>
                 <TrashButton
                   label="Eliminar"
+                  what={`La venta "${sale.item_description}"`}
                   pending={saleAction.pending && saleAction.pendingId === sale.id}
                   onRestore={() =>
                     saleAction.run(sale.id, restoreSale, "Venta restaurada")
@@ -269,6 +288,7 @@ export function TrashList({
                 </div>
                 <TrashButton
                   label="Eliminar"
+                  what={`El abono de ${formatCurrency(payment.amount)}`}
                   pending={
                     paymentAction.pending &&
                     paymentAction.pendingId === payment.id
@@ -317,6 +337,7 @@ export function TrashList({
                 </div>
                 <TrashButton
                   label="Eliminar"
+                  what={`El pedido "${preorder.product_name}"`}
                   pending={
                     preorderAction.pending &&
                     preorderAction.pendingId === preorder.id
