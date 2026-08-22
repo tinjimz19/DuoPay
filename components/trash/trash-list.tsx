@@ -10,7 +10,9 @@ import {
   restoreClient,
 } from "@/actions/client-actions";
 import {
+  purgePayment,
   purgeSale,
+  restorePayment,
   restoreSale,
 } from "@/actions/sale-actions";
 import {
@@ -33,6 +35,14 @@ export interface TrashSaleItem {
   item_description: string;
   client_name: string;
   total_amount: number;
+  deleted_at: string | null;
+}
+
+export interface TrashPaymentItem {
+  id: string;
+  amount: number;
+  payment_number: number | null;
+  sale_description: string;
   deleted_at: string | null;
 }
 
@@ -116,18 +126,24 @@ function TrashButton({
 export function TrashList({
   clients,
   sales,
+  payments,
   preorders,
 }: {
   clients: TrashClientItem[];
   sales: TrashSaleItem[];
+  payments: TrashPaymentItem[];
   preorders: TrashPreorderItem[];
 }) {
   const clientAction = useTrashAction();
   const saleAction = useTrashAction();
+  const paymentAction = useTrashAction();
   const preorderAction = useTrashAction();
 
   const empty =
-    clients.length === 0 && sales.length === 0 && preorders.length === 0;
+    clients.length === 0 &&
+    sales.length === 0 &&
+    payments.length === 0 &&
+    preorders.length === 0;
 
   if (empty) {
     return (
@@ -217,6 +233,58 @@ export function TrashList({
                       sale.id,
                       purgeSale,
                       "Venta eliminada definitivamente"
+                    )
+                  }
+                />
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
+
+      {payments.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Abonos ({payments.length})
+          </h2>
+          {payments.map((payment) => (
+            <Card
+              key={payment.id}
+              className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            >
+              <CardContent className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">
+                    {payment.payment_number
+                      ? `Cuota ${payment.payment_number}`
+                      : "Abono"}{" "}
+                    · {formatCurrency(payment.amount)}
+                  </p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {payment.sale_description}
+                    {payment.deleted_at
+                      ? ` · Eliminado el ${formatDate(payment.deleted_at)}`
+                      : ""}
+                  </p>
+                </div>
+                <TrashButton
+                  label="Eliminar"
+                  pending={
+                    paymentAction.pending &&
+                    paymentAction.pendingId === payment.id
+                  }
+                  onRestore={() =>
+                    paymentAction.run(
+                      payment.id,
+                      restorePayment,
+                      "Abono restaurado"
+                    )
+                  }
+                  onPurge={() =>
+                    paymentAction.run(
+                      payment.id,
+                      purgePayment,
+                      "Abono eliminado definitivamente"
                     )
                   }
                 />

@@ -5,7 +5,7 @@ import { grantSubscriptionDays } from "@/lib/admin-server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import type { ActionResult } from "@/actions/client-actions";
+import { zodMessage, type ActionResult } from "@/lib/validation";
 
 const createReportSchema = z.object({
   method: z.string().trim().min(2, "Indica el método de pago").max(60),
@@ -20,7 +20,11 @@ export type CreatePaymentReportInput = z.infer<typeof createReportSchema>;
 export async function createPaymentReport(
   input: CreatePaymentReportInput
 ): Promise<ActionResult> {
-  const parsed = createReportSchema.parse(input);
+  const parsedInput = createReportSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const supabase = createClient();
 
   const {
@@ -76,7 +80,11 @@ async function requireSuperAdmin() {
 export async function confirmPaymentReport(
   input: z.infer<typeof reviewSchema>
 ): Promise<ActionResult> {
-  const parsed = reviewSchema.parse(input);
+  const parsedInput = reviewSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const context = await requireSuperAdmin();
   if (!context) {
     return { success: false, error: "No autorizado" };
@@ -122,7 +130,11 @@ export async function confirmPaymentReport(
 export async function rejectPaymentReport(
   input: z.infer<typeof reviewSchema>
 ): Promise<ActionResult> {
-  const parsed = reviewSchema.parse(input);
+  const parsedInput = reviewSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const context = await requireSuperAdmin();
   if (!context) {
     return { success: false, error: "No autorizado" };

@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+
+import { zodMessage } from "@/lib/validation";
 import type { PreorderStatus } from "@/types/database.types";
 
 const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
@@ -30,7 +32,11 @@ const createPreorderSchema = z.object({
 export type CreatePreorderInput = z.infer<typeof createPreorderSchema>;
 
 export async function createPreorder(input: CreatePreorderInput) {
-  const parsed = createPreorderSchema.parse(input);
+  const parsedInput = createPreorderSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const supabase = createClient();
 
   const {
@@ -111,7 +117,11 @@ const updatePreorderSchema = z.object({
 });
 
 export async function updatePreorder(input: z.infer<typeof updatePreorderSchema>) {
-  const parsed = updatePreorderSchema.parse(input);
+  const parsedInput = updatePreorderSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const supabase = createClient();
 
   const {

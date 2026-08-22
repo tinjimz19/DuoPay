@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { zodMessage } from "@/lib/validation";
+
 export async function signOut() {
   const supabase = createClient();
   await supabase.auth.signOut();
@@ -19,7 +21,11 @@ const updateProfileSchema = z.object({
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
 export async function updateProfile(input: UpdateProfileInput) {
-  const parsed = updateProfileSchema.parse(input);
+  const parsedInput = updateProfileSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const supabase = createClient();
 
   const {

@@ -13,17 +13,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS } from "@/lib/labels";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { caracasDateStr, formatCurrency, formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { ProductCategory } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
-
-const CARACAS_OFFSET_MS = 4 * 60 * 60 * 1000;
-
-function caracasDateStr(d: Date) {
-  return new Date(d.getTime() - CARACAS_OFFSET_MS).toISOString().slice(0, 10);
-}
 
 function formatDay(day: string) {
   return new Intl.DateTimeFormat("es-VE", {
@@ -46,7 +40,7 @@ interface OpenSaleRow {
 }
 
 interface CompletedSaleRow {
-  payments: { created_at: string }[] | null;
+  payments: { created_at: string; deleted_at: string | null }[] | null;
 }
 
 interface SaleRow {
@@ -96,7 +90,7 @@ export default async function ReportesPage({
       .neq("status", "COMPLETED"),
     supabase
       .from("sales")
-      .select("status, payments(created_at)")
+      .select("status, payments(created_at, deleted_at)")
       .is("deleted_at", null)
       .eq("status", "COMPLETED"),
     supabase
@@ -120,11 +114,7 @@ export default async function ReportesPage({
 
   const dayMap = new Map<string, number>();
   for (const p of payments) {
-    const day = new Date(
-      new Date(p.created_at).getTime() - CARACAS_OFFSET_MS
-    )
-      .toISOString()
-      .slice(0, 10);
+    const day = caracasDateStr(new Date(p.created_at));
     dayMap.set(day, (dayMap.get(day) ?? 0) + Number(p.amount));
   }
   const perDay = Array.from(dayMap.entries()).sort((a, b) =>
@@ -151,9 +141,10 @@ export default async function ReportesPage({
   const completedSales = (completedData ?? []) as unknown as CompletedSaleRow[];
   let saldadosEnRango = 0;
   for (const s of completedSales) {
-    const pays = (s.payments ?? []).map((p) =>
-      new Date(p.created_at).getTime()
-    );
+    // Solo abonos vivos: uno borrado no puede decidir cuándo se saldó.
+    const pays = (s.payments ?? [])
+      .filter((p) => p.deleted_at === null)
+      .map((p) => new Date(p.created_at).getTime());
     if (!pays.length) continue;
     const lastStr = caracasDateStr(new Date(Math.max(...pays)));
     if (lastStr >= desdeStr && lastStr <= hastaStr) saldadosEnRango++;

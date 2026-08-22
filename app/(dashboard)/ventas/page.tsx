@@ -4,7 +4,10 @@ import Link from "next/link";
 import { SaleList } from "@/components/sales/sale-list";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import type { SaleCardData } from "@/components/sales/sale-card";
+import type {
+  PaymentRecord,
+  SaleCardData,
+} from "@/components/sales/sale-card";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +18,7 @@ export default async function VentasPage() {
     supabase
       .from("sales")
       .select(
-        "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, clients(name, phone)"
+        "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, clients(name, phone), payments(id, amount, payment_number, notes, created_at, deleted_at)"
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
@@ -37,6 +40,17 @@ export default async function VentasPage() {
       (s.clients as unknown as { name: string } | null)?.name ?? "Cliente",
     client_phone:
       (s.clients as unknown as { phone: string } | null)?.phone ?? null,
+    // Los abonos viajan con la venta para poder corregirlos desde la tarjeta.
+    payments: (
+      (s.payments ?? []) as unknown as (PaymentRecord & {
+        deleted_at: string | null;
+      })[]
+    )
+      .filter((p) => p.deleted_at === null)
+      .sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ),
   }));
 
   return (

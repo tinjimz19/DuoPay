@@ -10,7 +10,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency } from "@/lib/format";
+import { caracasDateStr, formatCurrency } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -24,45 +24,60 @@ export default async function DashboardPage() {
     initialRate = null;
   }
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
+  // El mes arranca a medianoche de Caracas, no del servidor (UTC en Vercel):
+  // si no, las últimas 4 horas del mes anterior se cuentan en este.
+  const startOfMonth = new Date(
+    `${caracasDateStr().slice(0, 8)}01T00:00:00-04:00`
+  );
 
-  const [{ data: sales }, { data: monthPayments }, { data: preorders }] =
-    await Promise.all([
-      supabase
-        .from("sales")
-        .select(
-          "id, item_description, total_amount, amount_paid, status, created_at, clients(name)"
-        )
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(6),
-      supabase
-        .from("payments")
-        .select("amount")
-        .is("deleted_at", null)
-        .gte("created_at", startOfMonth.toISOString()),
-      supabase
-        .from("preorders")
-        .select("id")
-        .is("deleted_at", null)
-        .eq("status", "PENDENT"),
-    ]);
+  // Ojo: la lista de "ventas recientes" está limitada a 6, así que NO sirve
+  // para los totales. Cada KPI se consulta sobre todas las ventas.
+  const [
+    { data: recentSales },
+    { data: openSales },
+    { count: completedCount },
+    { data: monthPayments },
+    { count: pendingPreorders },
+  ] = await Promise.all([
+    supabase
+      .from("sales")
+      .select(
+        "id, item_description, total_amount, amount_paid, status, created_at, clients(name)"
+      )
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(6),
+    supabase
+      .from("sales")
+      .select("total_amount, amount_paid")
+      .is("deleted_at", null)
+      .neq("status", "COMPLETED"),
+    supabase
+      .from("sales")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .eq("status", "COMPLETED"),
+    supabase
+      .from("payments")
+      .select("amount")
+      .is("deleted_at", null)
+      .gte("created_at", startOfMonth.toISOString()),
+    supabase
+      .from("preorders")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .eq("status", "PENDENT"),
+  ]);
 
-  const salesList = sales ?? [];
-  const pendingTotal = salesList.reduce((sum, s) => {
-    if (s.status === "PENDING" || s.status === "PARTIAL") {
-      return sum + (Number(s.total_amount) - Number(s.amount_paid));
-    }
-    return sum;
-  }, 0);
+  const salesList = recentSales ?? [];
+  const pendingTotal = (openSales ?? []).reduce(
+    (sum, s) => sum + (Number(s.total_amount) - Number(s.amount_paid)),
+    0
+  );
   const monthCollected = (monthPayments ?? []).reduce(
     (sum, p) => sum + Number(p.amount),
     0
   );
-  const completedCount = salesList.filter((s) => s.status === "COMPLETED").length;
-  const pendingPreorders = preorders?.length ?? 0;
 
   const kpis = [
     {
@@ -81,13 +96,13 @@ export default async function DashboardPage() {
     },
     {
       label: "Cuentas saldadas",
-      value: String(completedCount),
+      value: String(completedCount ?? 0),
       icon: CheckCheck,
       valueClass: "text-sky-600 dark:text-sky-400",
     },
     {
       label: "Pedidos pendientes",
-      value: String(pendingPreorders),
+      value: String(pendingPreorders ?? 0),
       icon: PackagePlus,
       valueClass: "text-violet-600 dark:text-violet-400",
     },

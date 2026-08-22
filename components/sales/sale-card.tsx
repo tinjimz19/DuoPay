@@ -1,11 +1,24 @@
 "use client";
 
-import { Loader2, MoreHorizontal, HandCoins, Trash2 } from "lucide-react";
+import {
+  Check,
+  HandCoins,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { deleteSale, recordPayment } from "@/actions/sale-actions";
+import {
+  deletePayment,
+  deleteSale,
+  recordPayment,
+  updatePayment,
+} from "@/actions/sale-actions";
 import { getEuroRate } from "@/actions/rates";
 import { CategoryBadge } from "@/components/category-badge";
 import { SaleStatusBadge } from "@/components/status-badge";
@@ -27,7 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { formatBs, formatCurrency } from "@/lib/format";
+import { formatBs, formatCurrency, formatDateTime } from "@/lib/format";
 import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
@@ -56,6 +69,165 @@ export interface SaleCardData {
   client_name: string;
   client_phone?: string | null;
   payments?: PaymentRecord[];
+}
+
+function parseAmount(raw: string): number {
+  return parseFloat(raw.replace(",", "."));
+}
+
+/**
+ * Una fila del historial de abonos, editable en sitio.
+ * Corregir un monto mal tecleado no debería obligar a borrar la venta.
+ */
+function PaymentRow({
+  payment,
+  disabled,
+  onChanged,
+}: {
+  payment: PaymentRecord;
+  disabled: boolean;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(String(payment.amount));
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const [pending, startTransition] = React.useTransition();
+
+  const parsed = parseAmount(draft);
+  const busy = pending || disabled;
+
+  function save() {
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error("Monto inválido");
+      return;
+    }
+    startTransition(async () => {
+      const res = await updatePayment({
+        id: payment.id,
+        amount: parsed,
+        notes: payment.notes,
+      });
+      if (res.success) {
+        toast.success("Abono corregido");
+        setEditing(false);
+        onChanged();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function remove() {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      setTimeout(() => setConfirmingDelete(false), 2500);
+      return;
+    }
+    setConfirmingDelete(false);
+    startTransition(async () => {
+      const res = await deletePayment(payment.id);
+      if (res.success) {
+        toast.success("Abono eliminado · está en la papelera");
+        onChanged();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/50 p-2 dark:border-indigo-900 dark:bg-indigo-950/30">
+        <Input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.01"
+          autoFocus
+          className="h-9 flex-1"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          aria-label="Nuevo monto del abono"
+        />
+        <Button
+          type="button"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          disabled={busy}
+          onClick={save}
+          aria-label="Guardar monto"
+        >
+          {pending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 shrink-0"
+          disabled={busy}
+          onClick={() => {
+            setDraft(String(payment.amount));
+            setEditing(false);
+          }}
+          aria-label="Cancelar"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-slate-700 dark:text-slate-300">
+          {payment.payment_number ? `Cuota ${payment.payment_number}` : "Abono"}
+          {payment.notes ? ` · ${payment.notes}` : ""}
+        </p>
+        <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+          {formatDateTime(payment.created_at)}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+        {formatCurrency(Number(payment.amount))}
+      </span>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8 shrink-0 text-slate-400"
+        disabled={busy}
+        onClick={() => setEditing(true)}
+        aria-label="Corregir abono"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className={
+          confirmingDelete
+            ? "h-8 w-8 shrink-0 text-destructive"
+            : "h-8 w-8 shrink-0 text-slate-400 hover:text-destructive"
+        }
+        disabled={busy}
+        onClick={remove}
+        aria-label={confirmingDelete ? "Confirmar borrado" : "Eliminar abono"}
+        title={confirmingDelete ? "Toca otra vez para confirmar" : "Eliminar"}
+      >
+        {pending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Trash2 className="h-3.5 w-3.5" />
+        )}
+      </Button>
+    </div>
+  );
 }
 
 export function SaleCard({
@@ -92,8 +264,12 @@ export function SaleCard({
   const total = Number(sale.total_amount);
   const remaining = Math.max(0, total - paid);
   const percent = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
-  const paymentCount = sale.payments?.length ?? 0;
-  const nextNumber = paymentCount + 1;
+  const payments = sale.payments ?? [];
+
+  // Siguiente cuota = la mayor registrada + 1. Contar filas repetiría un
+  // número si se borró un abono intermedio.
+  const nextNumber =
+    payments.reduce((max, p) => Math.max(max, p.payment_number ?? 0), 0) + 1;
   const suggested = Math.min(Number(sale.installment_amount), remaining);
 
   function handleDelete() {
@@ -109,13 +285,13 @@ export function SaleCard({
         setConfirmingDelete(false);
         router.refresh();
       } else {
-        toast.error(res.error ?? "Error al eliminar");
+        toast.error(res.error);
       }
     });
   }
 
   function handlePay(amount: number) {
-    if (amount <= 0 || amount > remaining) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Monto inválido");
       return;
     }
@@ -123,22 +299,25 @@ export function SaleCard({
       const res = await recordPayment({
         saleId: sale.id,
         amount,
-        paymentNumber: nextNumber,
         notes: notes.trim() || null,
       });
       if (res.success) {
-        toast.success("Abono registrado");
+        toast.success(
+          res.clamped
+            ? `Se registró ${formatCurrency(res.amount)}: era todo lo que faltaba`
+            : "Abono registrado"
+        );
         setCustomAmount("");
         setNotes("");
         setOpen(false);
         router.refresh();
       } else {
-        toast.error(res.error ?? "Error al registrar el abono");
+        toast.error(res.error);
       }
     });
   }
 
-  const parsedCustom = parseFloat(customAmount.replace(",", "."));
+  const parsedCustom = parseAmount(customAmount);
 
   const suggestedBs = euroRate ? suggested * euroRate : null;
   const customBs =
@@ -190,7 +369,7 @@ export function SaleCard({
           </button>
         </DialogTrigger>
 
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Registrar abono</DialogTitle>
             <DialogDescription>
@@ -223,7 +402,7 @@ export function SaleCard({
             />
           </div>
 
-          {sale.status === "COMPLETED" ? (
+          {remaining <= 0 ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
               Esta venta ya está saldada.
             </div>
@@ -232,7 +411,7 @@ export function SaleCard({
               <Button
                 type="button"
                 className="h-12 w-full text-sm"
-                disabled={pending || remaining <= 0}
+                disabled={pending}
                 onClick={() => handlePay(suggested)}
               >
                 {pending && <Loader2 className="animate-spin" />}
@@ -245,10 +424,12 @@ export function SaleCard({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="custom-amount">Monto personalizado</Label>
+                <Label htmlFor={`custom-amount-${sale.id}`}>
+                  Monto personalizado
+                </Label>
                 <div className="flex gap-2">
                   <Input
-                    id="custom-amount"
+                    id={`custom-amount-${sale.id}`}
                     type="number"
                     inputMode="decimal"
                     min="0"
@@ -280,17 +461,33 @@ export function SaleCard({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="payment-notes">
+                <Label htmlFor={`payment-notes-${sale.id}`}>
                   Nota <span className="text-slate-400">(opcional)</span>
                 </Label>
                 <Input
-                  id="payment-notes"
+                  id={`payment-notes-${sale.id}`}
                   placeholder="Ej: abonó efectivo"
                   className="h-11"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
+            </div>
+          )}
+
+          {payments.length > 0 && (
+            <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Abonos registrados ({payments.length})
+              </p>
+              {payments.map((payment) => (
+                <PaymentRow
+                  key={payment.id}
+                  payment={payment}
+                  disabled={pending}
+                  onChanged={() => router.refresh()}
+                />
+              ))}
             </div>
           )}
         </DialogContent>

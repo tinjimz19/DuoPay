@@ -5,7 +5,7 @@ import { grantSubscriptionDays } from "@/lib/admin-server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import type { ActionResult } from "@/actions/client-actions";
+import { zodMessage, type ActionResult } from "@/lib/validation";
 
 const TRIAL_DAYS = 3;
 
@@ -43,7 +43,11 @@ function addDays(base: Date, days: number) {
 export async function activateStore(
   input: z.infer<typeof storeActionSchema>
 ): Promise<ActionResult> {
-  const parsed = storeActionSchema.parse(input);
+  const parsedInput = storeActionSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const context = await requireSuperAdmin();
   if (!context) {
     return { success: false, error: "No autorizado" };
@@ -65,7 +69,11 @@ export async function activateStore(
 export async function suspendStore(
   input: z.infer<typeof storeActionSchema>
 ): Promise<ActionResult> {
-  const parsed = storeActionSchema.parse(input);
+  const parsedInput = storeActionSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const context = await requireSuperAdmin();
   if (!context) {
     return { success: false, error: "No autorizado" };
@@ -89,7 +97,11 @@ export async function suspendStore(
 export async function markStoreExpired(
   input: z.infer<typeof storeActionSchema>
 ): Promise<ActionResult> {
-  const parsed = storeActionSchema.parse(input);
+  const parsedInput = storeActionSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const context = await requireSuperAdmin();
   if (!context) {
     return { success: false, error: "No autorizado" };
@@ -113,7 +125,11 @@ export async function markStoreExpired(
 export async function reactivateTrial(
   input: z.infer<typeof storeActionSchema>
 ): Promise<ActionResult> {
-  const parsed = storeActionSchema.parse(input);
+  const parsedInput = storeActionSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
   const context = await requireSuperAdmin();
   if (!context) {
     return { success: false, error: "No autorizado" };

@@ -4,7 +4,9 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-const createClientSchema = z.object({
+import { zodMessage, type ActionResult } from "@/lib/validation";
+
+const clientFieldsSchema = {
   name: z.string().min(2, "El nombre es obligatorio").max(120),
   phone: z
     .string()
@@ -12,19 +14,21 @@ const createClientSchema = z.object({
     .min(7, "El número de teléfono es obligatorio")
     .max(30),
   notes: z.string().max(500).optional().nullable(),
-});
+};
+
+const createClientSchema = z.object(clientFieldsSchema);
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
-
-export type ActionResult<T = {}> = ({ success: true } & T) | {
-  success: false;
-  error: string;
-};
 
 export async function createClient(
   input: CreateClientInput
 ): Promise<ActionResult<{ id: string }>> {
-  const parsed = createClientSchema.parse(input);
+  const parsed = createClientSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: zodMessage(parsed.error) };
+  }
+  const values = parsed.data;
+
   const supabase = createSupabaseClient();
 
   const {
@@ -33,22 +37,25 @@ export async function createClient(
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return { success: false as const, error: "No autorizado" };
+    return { success: false, error: "No autorizado" };
   }
 
   const { data, error } = await supabase
     .from("clients")
     .insert({
       user_id: user.id,
-      name: parsed.name.trim(),
-      phone: parsed.phone.trim(),
-      notes: parsed.notes?.trim() || null,
+      name: values.name.trim(),
+      phone: values.phone.trim(),
+      notes: values.notes?.trim() || null,
     })
     .select("id")
     .single();
 
   if (error || !data) {
-    return { success: false as const, error: error?.message ?? "Error al crear el cliente" };
+    return {
+      success: false,
+      error: error?.message ?? "Error al crear el cliente",
+    };
   }
 
   revalidatePath("/");
@@ -56,24 +63,23 @@ export async function createClient(
   revalidatePath("/ventas");
   revalidatePath("/ventas/nueva");
 
-  return { success: true as const, id: data.id };
+  return { success: true, id: data.id };
 }
 
 const updateClientSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(2, "El nombre es obligatorio").max(120),
-  phone: z
-    .string()
-    .trim()
-    .min(7, "El número de teléfono es obligatorio")
-    .max(30),
-  notes: z.string().max(500).optional().nullable(),
+  ...clientFieldsSchema,
 });
 
 export async function updateClient(
   input: z.infer<typeof updateClientSchema>
 ): Promise<ActionResult> {
-  const parsed = updateClientSchema.parse(input);
+  const parsed = updateClientSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: zodMessage(parsed.error) };
+  }
+  const values = parsed.data;
+
   const supabase = createSupabaseClient();
 
   const {
@@ -88,11 +94,11 @@ export async function updateClient(
   const { error } = await supabase
     .from("clients")
     .update({
-      name: parsed.name.trim(),
-      phone: parsed.phone.trim(),
-      notes: parsed.notes?.trim() || null,
+      name: values.name.trim(),
+      phone: values.phone.trim(),
+      notes: values.notes?.trim() || null,
     })
-    .eq("id", parsed.id)
+    .eq("id", values.id)
     .eq("user_id", user.id);
 
   if (error) {
@@ -100,9 +106,17 @@ export async function updateClient(
   }
 
   revalidatePath("/clientes");
-  revalidatePath(`/clientes/${parsed.id}`);
+  revalidatePath(`/clientes/${values.id}`);
   return { success: true };
 }
+
+// ------------------------------------------------------------------
+// Papelera
+//
+// Al borrar un cliente, sus ventas y abonos caen marcados con
+// deleted_via = 'client'. Restaurar solo revive esos: una venta que se
+// borró aparte hace meses se queda en la papelera donde la dejaste.
+// ------------------------------------------------------------------
 
 export async function deleteClient(id: string): Promise<ActionResult> {
   const supabase = createSupabaseClient();
@@ -118,7 +132,6 @@ export async function deleteClient(id: string): Promise<ActionResult> {
 
   const now = new Date().toISOString();
 
-  // Papelera: cliente + sus ventas + los abonos de esas ventas.
   const { data: sales } = await supabase
     .from("sales")
     .select("id")
@@ -129,15 +142,20 @@ export async function deleteClient(id: string): Promise<ActionResult> {
   const saleIds = (sales ?? []).map((s) => s.id);
 
   if (saleIds.length > 0) {
-    await supabase
-      .from("payments")
-      .update({ deleted_at: now })
-      .in("sale_id", saleIds)
-      .is("deleted_at", null);
+    // Las ventas primero: con la venta ya en papelera, borrar sus abonos no
+    // dispara el recálculo y las cifras quedan congeladas.
     await supabase
       .from("sales")
-      .update({ deleted_at: now })
-      .in("id", saleIds);
+      .update({ deleted_at: now, deleted_via: "client" })
+      .in("id", saleIds)
+      .eq("user_id", user.id);
+
+    await supabase
+      .from("payments")
+      .update({ deleted_at: now, deleted_via: "client" })
+      .in("sale_id", saleIds)
+      .eq("user_id", user.id)
+      .is("deleted_at", null);
   }
 
   const { error } = await supabase
@@ -153,6 +171,7 @@ export async function deleteClient(id: string): Promise<ActionResult> {
   revalidatePath("/");
   revalidatePath("/clientes");
   revalidatePath("/ventas");
+  revalidatePath("/reportes");
   revalidatePath("/papelera");
   return { success: true };
 }
@@ -174,16 +193,25 @@ export async function restoreClient(id: string): Promise<ActionResult> {
     .select("id")
     .eq("client_id", id)
     .eq("user_id", user.id)
-    .not("deleted_at", "is", null);
+    .eq("deleted_via", "client");
 
   const saleIds = (sales ?? []).map((s) => s.id);
 
   if (saleIds.length > 0) {
+    // Los abonos primero: mientras la venta siga en papelera el trigger no
+    // recalcula, así que al restaurar la venta ya encuentra sus abonos.
     await supabase
       .from("payments")
-      .update({ deleted_at: null })
-      .in("sale_id", saleIds);
-    await supabase.from("sales").update({ deleted_at: null }).in("id", saleIds);
+      .update({ deleted_at: null, deleted_via: null })
+      .in("sale_id", saleIds)
+      .eq("user_id", user.id)
+      .eq("deleted_via", "client");
+
+    await supabase
+      .from("sales")
+      .update({ deleted_at: null, deleted_via: null })
+      .in("id", saleIds)
+      .eq("user_id", user.id);
   }
 
   const { error } = await supabase
@@ -198,7 +226,9 @@ export async function restoreClient(id: string): Promise<ActionResult> {
 
   revalidatePath("/");
   revalidatePath("/clientes");
+  revalidatePath(`/clientes/${id}`);
   revalidatePath("/ventas");
+  revalidatePath("/reportes");
   revalidatePath("/papelera");
   return { success: true };
 }

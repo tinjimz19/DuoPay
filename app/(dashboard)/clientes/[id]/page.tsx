@@ -32,6 +32,7 @@ interface PaymentRow {
   payment_number: number | null;
   notes: string | null;
   created_at: string;
+  deleted_at: string | null;
 }
 
 export default async function ClienteDetailPage({
@@ -52,7 +53,7 @@ export default async function ClienteDetailPage({
       supabase
         .from("sales")
         .select(
-          "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, payments(id, amount, payment_number, notes, created_at)"
+          "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, payments(id, amount, payment_number, notes, created_at, deleted_at)"
         )
         .eq("client_id", params.id)
         .is("deleted_at", null)
@@ -70,9 +71,18 @@ export default async function ClienteDetailPage({
     notFound();
   }
 
-  const saleList = (sales ?? []) as unknown as (Omit<SaleCardData, "client_name"> & {
+  const rawSales = (sales ?? []) as unknown as (Omit<
+    SaleCardData,
+    "client_name" | "payments"
+  > & {
     payments: PaymentRow[] | null;
   })[];
+
+  // Un abono en papelera no cuenta ni en el historial ni en el saldo.
+  const saleList = rawSales.map((sale) => ({
+    ...sale,
+    payments: (sale.payments ?? []).filter((p) => p.deleted_at === null),
+  }));
 
   const remainingTotal = saleList.reduce((sum, s) => {
     if (s.status === "COMPLETED") return sum;
@@ -80,9 +90,7 @@ export default async function ClienteDetailPage({
   }, 0);
 
   const allPayments = saleList
-    .flatMap((s) =>
-      (s.payments ?? []).map((p) => ({ ...p, sale: s }))
-    )
+    .flatMap((s) => s.payments.map((p) => ({ ...p, sale: s })))
     .sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -207,7 +215,7 @@ export default async function ClienteDetailPage({
                 sale={{
                   ...sale,
                   client_name: client.name,
-                  payments: sale.payments ?? [],
+                  client_phone: client.phone,
                 }}
               />
             ))}

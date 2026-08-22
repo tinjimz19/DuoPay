@@ -109,6 +109,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
+          deleted_via: string | null;
         };
         Insert: {
           id?: string;
@@ -124,6 +125,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
+          deleted_via?: string | null;
         };
         Update: {
           id?: string;
@@ -139,6 +141,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
+          deleted_via?: string | null;
         };
         Relationships: [
           {
@@ -165,6 +168,7 @@ export interface Database {
           notes: string | null;
           created_at: string;
           deleted_at: string | null;
+          deleted_via: string | null;
         };
         Insert: {
           id?: string;
@@ -175,6 +179,7 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          deleted_via?: string | null;
         };
         Update: {
           id?: string;
@@ -185,6 +190,7 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          deleted_via?: string | null;
         };
         Relationships: [
           {
