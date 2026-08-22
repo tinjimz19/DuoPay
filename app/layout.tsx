@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: "%s · DuoPay",
   },
   description:
-    "Gestión de clientes, ventas a fiado en cuotas y pedidos de mercancía.",
+    "Gestión de clientes, ventas a crédito en cuotas y pedidos de mercancía.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

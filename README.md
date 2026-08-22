@@ -1,6 +1,6 @@
 # DuoPay
 
-PWA de uso personal para gestionar **clientes, ventas a fiado en cuotas configurables, abonos y pedidos/encargos** de mercancía (ropa, calzado y perfumes). Multi-usuario aislado mediante Supabase Auth + Row Level Security.
+PWA de uso personal para gestionar **clientes, ventas a crédito en cuotas configurables, abonos y pedidos/encargos** de mercancía (ropa, calzado y perfumes). Multi-usuario aislado mediante Supabase Auth + Row Level Security.
 
 ## Stack
 

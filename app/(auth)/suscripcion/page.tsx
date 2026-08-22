@@ -12,7 +12,7 @@ const REASONS: Record<ProfileStatus, { title: string; message: string }> = {
   TRIAL: {
     title: "Tu prueba gratuita terminó",
     message:
-      "Los 3 días de prueba han finalizado. Activa tu suscripción para seguir gestionando tus ventas a fiado.",
+      "Los 3 días de prueba han finalizado. Activa tu suscripción para seguir gestionando tus ventas a crédito.",
   },
   ACTIVE: {
     title: "Suscripción vencida",
@@ -76,7 +76,7 @@ export default async function SuscripcionPage() {
           $10<span className="text-sm font-medium text-slate-500 dark:text-slate-400">/mes</span>
         </p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Clientes, ventas a fiado, abonos y pedidos ilimitados
+          Clientes, ventas a crédito, abonos y pedidos ilimitados
         </p>
       </div>
 

@@ -359,7 +359,7 @@ export function CobranzaList({
       <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <CardContent className="flex flex-col items-center gap-2 p-8 text-center text-sm text-slate-500 dark:text-slate-400">
           <Users className="h-8 w-8 text-slate-300 dark:text-slate-600" />
-          No hay ventas a fiado abiertas.
+          No hay ventas a crédito abiertas.
         </CardContent>
       </Card>
     );

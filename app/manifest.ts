@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "DuoPay",
     short_name: "DuoPay",
-    description: "Gestión de clientes, ventas a fiado y pedidos de mercancía",
+    description: "Gestión de clientes, ventas a crédito y pedidos de mercancía",
     id: "/",
     start_url: "/",
     scope: "/",

@@ -1,4 +1,4 @@
-import { caracasDateStr } from "@/lib/format";
+import { caracasDateStr, MESES_CORTOS } from "@/lib/format";
 
 /**
  * En Venezuela la gente cobra sueldo el 15 y el 1ero, así que la cobranza no
@@ -15,11 +15,6 @@ import { caracasDateStr } from "@/lib/format";
  * De la venta solo se guarda en qué quincena empieza a cobrarse
  * (`first_charge_date`). Todo lo demás se deriva.
  */
-
-const MESES_CORTOS = [
-  "ene", "feb", "mar", "abr", "may", "jun",
-  "jul", "ago", "sep", "oct", "nov", "dic",
-];
 
 const MESES_LARGOS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",

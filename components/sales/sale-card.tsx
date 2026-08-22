@@ -41,7 +41,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { formatBs, formatCurrency, formatDateTime } from "@/lib/format";
+import { formatBs, formatCurrency, formatTimeShort } from "@/lib/format";
 import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
@@ -199,8 +199,8 @@ function PaymentRow({
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
         <p className="truncate text-xs text-slate-400 dark:text-slate-500">
-          Quincena del {quincenaLabelForDate(payment.created_at)} ·{" "}
-          {formatDateTime(payment.created_at)}
+          15na del {quincenaLabelForDate(payment.created_at)},{" "}
+          {formatTimeShort(payment.created_at)}
         </p>
       </div>
       <span className="shrink-0 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
@@ -404,7 +404,7 @@ export function SaleCard({
           </button>
         </DialogTrigger>
 
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Registrar abono</DialogTitle>
             <DialogDescription>

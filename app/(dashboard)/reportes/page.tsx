@@ -131,12 +131,12 @@ export default async function ReportesPage({
   const maxCategory = Math.max(0, ...perCategory.map(([, amount]) => amount));
 
   const openSales = (openSalesData ?? []) as unknown as OpenSaleRow[];
-  const quedaEnFiado = openSales.reduce(
+  const quedaEnCredito = openSales.reduce(
     (sum, s) =>
       sum + (Number(s.total_amount) - Number(s.amount_paid)),
     0
   );
-  const fiadosActivos = openSales.length;
+  const creditosActivos = openSales.length;
 
   const completedSales = (completedData ?? []) as unknown as CompletedSaleRow[];
   let saldadosEnRango = 0;
@@ -187,19 +187,19 @@ export default async function ReportesPage({
       valueClass: "text-emerald-600 dark:text-emerald-400",
     },
     {
-      label: "Queda en fiado",
-      value: formatCurrency(quedaEnFiado),
+      label: "Queda en crédito",
+      value: formatCurrency(quedaEnCredito),
       icon: HandCoins,
       valueClass: "text-amber-600 dark:text-amber-400",
     },
     {
-      label: "Fiados activos",
-      value: String(fiadosActivos),
+      label: "Créditos activos",
+      value: String(creditosActivos),
       icon: ShoppingBag,
       valueClass: "text-sky-600 dark:text-sky-400",
     },
     {
-      label: "Fiados saldados",
+      label: "Créditos saldados",
       value: String(saldadosEnRango),
       icon: CheckCheck,
       valueClass: "text-violet-600 dark:text-violet-400",

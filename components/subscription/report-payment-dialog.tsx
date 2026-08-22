@@ -34,12 +34,15 @@ interface ReportPaymentDialogProps {
   triggerLabel: string;
   triggerVariant?: "default" | "outline" | "ghost" | "secondary";
   triggerClassName?: string;
+  /** El ícono no cabe cuando el disparador es una insignia pequeña. */
+  showTriggerIcon?: boolean;
 }
 
 export function ReportPaymentDialog({
   triggerLabel,
   triggerVariant = "default",
   triggerClassName,
+  showTriggerIcon = true,
 }: ReportPaymentDialogProps) {
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
@@ -128,7 +131,7 @@ export function ReportPaymentDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={triggerVariant} className={triggerClassName}>
-          <UploadCloud />
+          {showTriggerIcon && <UploadCloud />}
           {triggerLabel}
         </Button>
       </DialogTrigger>

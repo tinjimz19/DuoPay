@@ -17,28 +17,15 @@ const items = [
   { href: "/pedidos", label: "Pedidos", icon: Package },
 ];
 
-interface BottomNavProps {
-  cutoffLabel?: string | null;
-  cutoffUrgent?: boolean;
-}
-
-export function BottomNav({ cutoffLabel, cutoffUrgent }: BottomNavProps) {
+export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-slate-800 dark:bg-slate-900 md:hidden">
-      {cutoffLabel && (
-        <p
-          className={cn(
-            "py-1 text-center text-[10px] font-medium",
-            cutoffUrgent
-              ? "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
-              : "text-slate-400 dark:text-slate-500"
-          )}
-        >
-          {cutoffLabel}
-        </p>
-      )}
+    // El safe-area del iPhone deja ~34px de aire muerto bajo los íconos. Le
+    // restamos casi todo: el indicador de inicio puede solaparse con el borde
+    // inferior de la fila sin tapar ícono ni texto. En Android env() es 0, así
+    // que ahí no cambia nada.
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white pb-[max(0px,calc(env(safe-area-inset-bottom)-1.25rem))] dark:border-slate-800 dark:bg-slate-900 md:hidden">
       <div className="mx-auto grid max-w-md grid-cols-5">
         {items.map((item) => {
           const active =

@@ -124,7 +124,7 @@ export function ClientFormDialog({
             <DialogDescription>
               {isEdit
                 ? "Actualiza los datos de contacto del cliente."
-                : "Registra un cliente para venderle a fiado."}
+                : "Registra un cliente para venderle a crédito."}
             </DialogDescription>
           )}
         </DialogHeader>

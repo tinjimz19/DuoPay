@@ -309,7 +309,7 @@ export function NewSaleForm({
 
         <Button type="submit" className="h-12 w-full" disabled={loading}>
           {loading && <Loader2 className="animate-spin" />}
-          Registrar venta a fiado
+          Registrar venta a crédito
         </Button>
       </form>
     </Form>

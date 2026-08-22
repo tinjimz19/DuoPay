@@ -35,7 +35,7 @@ export function Sidebar() {
         <div>
           <p className="font-bold text-slate-900 dark:text-slate-100">DuoPay</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Fiado, pagos y pedidos
+            Crédito, pagos y pedidos
           </p>
         </div>
       </div>

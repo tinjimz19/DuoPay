@@ -30,7 +30,7 @@ export default async function NuevaVentaPage() {
       <BackLink href="/ventas" label="Ventas" />
       <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <CardHeader>
-          <CardTitle>Registrar entrega a fiado</CardTitle>
+          <CardTitle>Registrar entrega a crédito</CardTitle>
           <CardDescription>
             Cada cuota es una quincena: se cobra el 15 y el 1ero.
           </CardDescription>

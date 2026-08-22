@@ -22,7 +22,12 @@ import {
   saleSchedule,
 } from "@/lib/quincenas";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate, formatDateTime, normalizePhone } from "@/lib/format";
+import {
+  formatCurrency,
+  formatDate,
+  formatTimeShort,
+  normalizePhone,
+} from "@/lib/format";
 import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
@@ -205,12 +210,12 @@ export default async function ClienteDetailPage({
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Mercancía fiada ({saleList.length})
+          Mercancía a crédito ({saleList.length})
         </h2>
         {saleList.length === 0 ? (
           <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             <CardContent className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-              Este cliente no tiene ventas a fiado.
+              Este cliente no tiene ventas a crédito.
             </CardContent>
           </Card>
         ) : (
@@ -264,9 +269,9 @@ export default async function ClienteDetailPage({
                       {p.notes ? ` · ${p.notes}` : ""}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {p.sale.item_description} · quincena del{" "}
-                      {quincenaLabelForDate(p.created_at)} ·{" "}
-                      {formatDateTime(p.created_at)}
+                      {p.sale.item_description} · 15na del{" "}
+                      {quincenaLabelForDate(p.created_at)},{" "}
+                      {formatTimeShort(p.created_at)}
                     </p>
                   </div>
                   <p className="shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">
