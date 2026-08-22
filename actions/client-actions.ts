@@ -160,6 +160,14 @@ export async function deleteClient(id: string): Promise<ActionResult> {
       .in("sale_id", saleIds)
       .eq("user_id", user.id)
       .is("deleted_at", null);
+
+    // La mercancía de esas ventas vuelve al inventario.
+    await supabase
+      .from("stock_movements")
+      .update({ deleted_at: now, deleted_via: "client" })
+      .in("sale_id", saleIds)
+      .eq("user_id", user.id)
+      .is("deleted_at", null);
   }
 
   const { error } = await supabase
@@ -176,6 +184,7 @@ export async function deleteClient(id: string): Promise<ActionResult> {
   revalidatePath("/clientes");
   revalidatePath("/ventas");
   revalidatePath("/reportes");
+  revalidatePath("/inventario");
   revalidatePath("/papelera");
   return { success: true };
 }
@@ -212,6 +221,13 @@ export async function restoreClient(id: string): Promise<ActionResult> {
       .eq("deleted_via", "client");
 
     await supabase
+      .from("stock_movements")
+      .update({ deleted_at: null, deleted_via: null })
+      .in("sale_id", saleIds)
+      .eq("user_id", user.id)
+      .eq("deleted_via", "client");
+
+    await supabase
       .from("sales")
       .update({ deleted_at: null, deleted_via: null })
       .in("id", saleIds)
@@ -233,6 +249,7 @@ export async function restoreClient(id: string): Promise<ActionResult> {
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/ventas");
   revalidatePath("/reportes");
+  revalidatePath("/inventario");
   revalidatePath("/papelera");
   return { success: true };
 }

@@ -19,11 +19,18 @@ export const dynamic = "force-dynamic";
 export default async function NuevaVentaPage() {
   const supabase = createClient();
 
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, name")
-    .is("deleted_at", null)
-    .order("name");
+  const [{ data: clients }, { data: products }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, name")
+      .is("deleted_at", null)
+      .order("name"),
+    supabase
+      .from("products")
+      .select("id, name, category, stock")
+      .is("deleted_at", null)
+      .order("name"),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -38,6 +45,12 @@ export default async function NuevaVentaPage() {
         <CardContent>
           <NewSaleForm
             clients={clients ?? []}
+            products={(products ?? []).map((p) => ({
+              id: p.id,
+              name: p.name,
+              category: p.category,
+              stock: Number(p.stock),
+            }))}
             estaQuincena={quincenaLabel(currentQuincena())}
             proximaQuincena={quincenaLabel(nextQuincena())}
           />

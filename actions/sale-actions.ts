@@ -29,6 +29,7 @@ function revalidateSaleViews(clientId?: string | null) {
   revalidatePath("/clientes");
   revalidatePath("/cobranza");
   revalidatePath("/reportes");
+  revalidatePath("/inventario");
   if (clientId) {
     revalidatePath(`/clientes/${clientId}`);
   }
@@ -53,6 +54,20 @@ const createSaleSchema = z.object({
   // Desde qué jornada de cobro empieza a pagar. El cliente manda la
   // intención, no la fecha: así no puede llegar una fecha inventada.
   firstCharge: z.enum(["ESTA", "PROXIMA"]).default("PROXIMA"),
+  // Qué salió del inventario. Vacío = venta suelta que no mueve stock.
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.coerce
+          .number({ message: "Cantidad inválida" })
+          .int("Las cantidades deben ser enteras")
+          .positive("Las cantidades deben ser mayores a 0")
+          .max(10_000, "Cantidad demasiado grande"),
+      })
+    )
+    .max(20, "Demasiados productos en una venta")
+    .default([]),
   notes: z.string().max(500).optional().nullable(),
 });
 
@@ -78,6 +93,40 @@ export async function createSale(
     return { success: false, error: "No autorizado" };
   }
 
+  // Una misma línea repetida sumaría dos veces contra el mismo stock.
+  const wanted = new Map<string, number>();
+  for (const item of values.items) {
+    wanted.set(item.productId, (wanted.get(item.productId) ?? 0) + item.quantity);
+  }
+
+  // El tope del formulario es comodidad; la verdad se revalida aquí.
+  if (wanted.size > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, name, stock")
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .in("id", Array.from(wanted.keys()));
+
+    const byId = new Map((products ?? []).map((p) => [p.id, p]));
+
+    for (const [productId, quantity] of Array.from(wanted.entries())) {
+      const product = byId.get(productId);
+      if (!product) {
+        return { success: false, error: "Un producto de la venta ya no existe" };
+      }
+      if (quantity > Number(product.stock)) {
+        return {
+          success: false,
+          error:
+            Number(product.stock) <= 0
+              ? `No te queda ${product.name}`
+              : `Solo tienes ${product.stock} de ${product.name}`,
+        };
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from("sales")
     .insert({
@@ -101,6 +150,31 @@ export async function createSale(
       error: error ? dbErrorMessage(error.message) : "No se pudo registrar la venta",
     };
   }
+
+  if (wanted.size > 0) {
+    const { error: stockError } = await supabase.from("stock_movements").insert(
+      Array.from(wanted, ([productId, quantity]) => ({
+        user_id: user.id,
+        product_id: productId,
+        sale_id: data.id,
+        kind: "VENTA" as const,
+        quantity: -quantity,
+      }))
+    );
+
+    // La venta ya quedó registrada; si el stock falla se avisa pero no se
+    // pierde la venta, que es lo que de verdad importa.
+    if (stockError) {
+      revalidateSaleViews(values.clientId);
+      revalidatePath("/inventario");
+      return {
+        success: false,
+        error: `Se registró la venta, pero el inventario no se movió: ${dbErrorMessage(stockError.message)}`,
+      };
+    }
+  }
+
+  revalidatePath("/inventario");
 
   revalidateSaleViews(values.clientId);
   revalidatePath("/cobranza");
@@ -621,6 +695,14 @@ export async function deleteSale(id: string): Promise<ActionResult> {
     .eq("user_id", user.id)
     .is("deleted_at", null);
 
+  // La mercancía vuelve al inventario.
+  await supabase
+    .from("stock_movements")
+    .update({ deleted_at: now, deleted_via: "sale" })
+    .eq("sale_id", id)
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
+
   revalidateSaleViews(sale?.client_id);
   revalidatePath("/papelera");
   return { success: true };
@@ -664,6 +746,14 @@ export async function restoreSale(id: string): Promise<ActionResult> {
   // borrado.
   await supabase
     .from("payments")
+    .update({ deleted_at: null, deleted_via: null })
+    .eq("sale_id", id)
+    .eq("user_id", user.id)
+    .eq("deleted_via", "sale");
+
+  // Vuelve a salir del inventario lo que esta venta se llevó.
+  await supabase
+    .from("stock_movements")
     .update({ deleted_at: null, deleted_via: null })
     .eq("sale_id", id)
     .eq("user_id", user.id)

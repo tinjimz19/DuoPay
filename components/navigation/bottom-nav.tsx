@@ -1,20 +1,20 @@
 "use client";
 
-import { HandCoins, Home, Package, ShoppingBag, Users } from "lucide-react";
+import { Boxes, HandCoins, Home, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-// Cinco caben en una fila. Cobranza entra porque es la pantalla del día de
-// cobro; Reportes se consulta sentado, así que vive en el menú lateral y en
-// el acceso desde Inicio.
+// Cinco caben en una fila. Cobranza e Inventario entran porque se usan de
+// pie, con el cliente delante. Reportes y Pedidos se consultan sentado, así
+// que viven en el menú lateral y en los accesos desde Inicio.
 const items = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/cobranza", label: "Cobranza", icon: HandCoins },
   { href: "/ventas", label: "Ventas", icon: ShoppingBag },
   { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/pedidos", label: "Pedidos", icon: Package },
+  { href: "/inventario", label: "Inventario", icon: Boxes },
 ];
 
 export function BottomNav() {

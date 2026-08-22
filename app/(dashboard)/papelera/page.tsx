@@ -13,6 +13,7 @@ export default async function PapeleraPage() {
     { data: clients },
     { data: sales },
     { data: payments },
+    { data: products },
     { data: preorders },
   ] = await Promise.all([
       supabase
@@ -37,6 +38,11 @@ export default async function PapeleraPage() {
         )
         .not("deleted_at", "is", null)
         .is("deleted_via", null)
+        .order("deleted_at", { ascending: false }),
+      supabase
+        .from("products")
+        .select("id, name, category, stock, deleted_at")
+        .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false }),
       supabase
         .from("preorders")
@@ -75,6 +81,12 @@ export default async function PapeleraPage() {
           sale_description:
             (p.sales as unknown as { item_description: string } | null)
               ?.item_description ?? "Venta",
+          deleted_at: p.deleted_at,
+        }))}
+        products={(products ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          stock: Number(p.stock),
           deleted_at: p.deleted_at,
         }))}
         preorders={preorders ?? []}

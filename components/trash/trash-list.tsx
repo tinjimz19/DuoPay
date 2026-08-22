@@ -19,6 +19,10 @@ import {
   purgePreorder,
   restorePreorder,
 } from "@/actions/preorder-actions";
+import {
+  purgeProduct,
+  restoreProduct,
+} from "@/actions/product-actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +48,13 @@ export interface TrashPaymentItem {
   amount: number;
   payment_number: number | null;
   sale_description: string;
+  deleted_at: string | null;
+}
+
+export interface TrashProductItem {
+  id: string;
+  name: string;
+  stock: number;
   deleted_at: string | null;
 }
 
@@ -144,22 +155,26 @@ export function TrashList({
   clients,
   sales,
   payments,
+  products,
   preorders,
 }: {
   clients: TrashClientItem[];
   sales: TrashSaleItem[];
   payments: TrashPaymentItem[];
+  products: TrashProductItem[];
   preorders: TrashPreorderItem[];
 }) {
   const clientAction = useTrashAction();
   const saleAction = useTrashAction();
   const paymentAction = useTrashAction();
+  const productAction = useTrashAction();
   const preorderAction = useTrashAction();
 
   const empty =
     clients.length === 0 &&
     sales.length === 0 &&
     payments.length === 0 &&
+    products.length === 0 &&
     preorders.length === 0;
 
   if (empty) {
@@ -305,6 +320,57 @@ export function TrashList({
                       payment.id,
                       purgePayment,
                       "Abono eliminado definitivamente"
+                    )
+                  }
+                />
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
+
+      {products.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Productos ({products.length})
+          </h2>
+          {products.map((product) => (
+            <Card
+              key={product.id}
+              className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            >
+              <CardContent className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">
+                    {product.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {Math.max(0, product.stock)} unidad
+                    {product.stock === 1 ? "" : "es"}
+                    {product.deleted_at
+                      ? ` · Eliminado el ${formatDate(product.deleted_at)}`
+                      : ""}
+                  </p>
+                </div>
+                <TrashButton
+                  label="Eliminar"
+                  what={`El producto ${product.name}`}
+                  pending={
+                    productAction.pending &&
+                    productAction.pendingId === product.id
+                  }
+                  onRestore={() =>
+                    productAction.run(
+                      product.id,
+                      restoreProduct,
+                      "Producto restaurado"
+                    )
+                  }
+                  onPurge={() =>
+                    productAction.run(
+                      product.id,
+                      purgeProduct,
+                      "Producto eliminado definitivamente"
                     )
                   }
                 />

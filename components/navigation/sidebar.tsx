@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Boxes,
   HandCoins,
   Home,
   Package,
@@ -20,6 +21,7 @@ const items = [
   { href: "/cobranza", label: "Cobranza", icon: HandCoins },
   { href: "/ventas", label: "Ventas", icon: ShoppingBag },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/pedidos", label: "Pedidos", icon: Package },
   { href: "/papelera", label: "Papelera", icon: Trash2 },

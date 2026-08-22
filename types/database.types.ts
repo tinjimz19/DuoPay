@@ -12,6 +12,7 @@ export type PreorderStatus = "PENDENT" | "ORDERED" | "DELIVERED" | "CANCELLED";
 export type ProfileRole = "owner" | "super_admin";
 export type ProfileStatus = "TRIAL" | "ACTIVE" | "SUSPENDED" | "EXPIRED";
 export type PaymentReportStatus = "PENDING" | "CONFIRMED" | "REJECTED";
+export type StockMovementKind = "ENTRADA" | "VENTA" | "SALIDA" | "AJUSTE";
 
 export interface Database {
   public: {
@@ -268,6 +269,95 @@ export interface Database {
           }
         ];
       };
+      products: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          category: ProductCategory;
+          stock: number;
+          created_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          category?: ProductCategory;
+          stock?: number;
+          created_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          category?: ProductCategory;
+          stock?: number;
+          created_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "products_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      stock_movements: {
+        Row: {
+          id: string;
+          user_id: string;
+          product_id: string;
+          sale_id: string | null;
+          kind: StockMovementKind;
+          quantity: number;
+          notes: string | null;
+          created_at: string;
+          deleted_at: string | null;
+          deleted_via: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          product_id: string;
+          sale_id?: string | null;
+          kind: StockMovementKind;
+          quantity: number;
+          notes?: string | null;
+          created_at?: string;
+          deleted_at?: string | null;
+          deleted_via?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          product_id?: string;
+          sale_id?: string | null;
+          kind?: StockMovementKind;
+          quantity?: number;
+          notes?: string | null;
+          created_at?: string;
+          deleted_at?: string | null;
+          deleted_via?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_sale_id_fkey";
+            columns: ["sale_id"];
+            referencedRelation: "sales";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       payment_reports: {
         Row: {
           id: string;
@@ -334,6 +424,7 @@ export interface Database {
       profile_role: ProfileRole;
       profile_status: ProfileStatus;
       payment_report_status: PaymentReportStatus;
+      stock_movement_kind: StockMovementKind;
     };
     CompositeTypes: {
       [_ in never]: never;

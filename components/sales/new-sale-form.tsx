@@ -10,6 +10,11 @@ import { z } from "zod";
 
 import { createSale } from "@/actions/sale-actions";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
+import {
+  SaleItemsField,
+  type SaleItemDraft,
+  type StockProduct,
+} from "@/components/sales/sale-items-field";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -54,10 +59,12 @@ type SaleValues = z.infer<typeof saleSchema>;
 
 export function NewSaleForm({
   clients,
+  products,
   estaQuincena,
   proximaQuincena,
 }: {
   clients: { id: string; name: string }[];
+  products: StockProduct[];
   /** Etiqueta de la jornada de cobro vigente, ej. "15 de ago". */
   estaQuincena: string;
   /** Etiqueta de la siguiente, ej. "1 de sep". */
@@ -66,6 +73,40 @@ export function NewSaleForm({
   const router = useRouter();
   const [clientOptions, setClientOptions] = React.useState(clients);
   const [loading, setLoading] = React.useState(false);
+  const [items, setItems] = React.useState<SaleItemDraft[]>([]);
+  // Mientras no escriba nada a mano, la descripción y la categoría se
+  // arman solas con lo que elija del inventario.
+  const [descTouched, setDescTouched] = React.useState(false);
+  const [catTouched, setCatTouched] = React.useState(false);
+
+  const productById = React.useMemo(
+    () => new Map(products.map((p) => [p.id, p])),
+    [products]
+  );
+
+  React.useEffect(() => {
+    if (items.length === 0) return;
+
+    if (!descTouched) {
+      const texto = items
+        .map((item) => {
+          const product = productById.get(item.productId);
+          if (!product) return null;
+          return item.quantity > 1
+            ? `${item.quantity} ${product.name}`
+            : product.name;
+        })
+        .filter(Boolean)
+        .join(" + ");
+      if (texto) form.setValue("itemDescription", texto);
+    }
+
+    if (!catTouched) {
+      const primero = productById.get(items[0].productId);
+      if (primero) form.setValue("category", primero.category);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, descTouched, catTouched, productById]);
 
   const form = useForm<SaleValues>({
     resolver: zodResolver(saleSchema),
@@ -95,6 +136,7 @@ export function NewSaleForm({
       ...values,
       totalAmount: Number(values.totalAmount),
       installmentsCount: Number(values.installmentsCount),
+      items,
     });
     setLoading(false);
 
@@ -146,6 +188,12 @@ export function NewSaleForm({
           />
         </div>
 
+        <SaleItemsField
+          products={products}
+          value={items}
+          onChange={setItems}
+        />
+
         <FormField
           control={form.control}
           name="itemDescription"
@@ -157,6 +205,10 @@ export function NewSaleForm({
                   placeholder="Ej: Zapatos Nike Blancos Talla 40 + Perfume Carolina Herrera"
                   rows={2}
                   {...field}
+                  onChange={(e) => {
+                    setDescTouched(true);
+                    field.onChange(e);
+                  }}
                 />
               </FormControl>
               <FormMessage />
@@ -170,7 +222,13 @@ export function NewSaleForm({
           render={({ field }) => (
             <FormItem>
 <FormLabel>Categoría</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select
+                  onValueChange={(v) => {
+                    setCatTouched(true);
+                    field.onChange(v);
+                  }}
+                  value={field.value}
+                >
                   <FormControl>
                     <SelectTrigger className="h-11">
                       <SelectValue placeholder="Categoría" />
