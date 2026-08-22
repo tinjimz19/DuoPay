@@ -1,4 +1,11 @@
-import { CheckCheck, HandCoins, PackagePlus, TrendingUp } from "lucide-react";
+import {
+  BarChart3,
+  CheckCheck,
+  ChevronRight,
+  HandCoins,
+  PackagePlus,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 
 import { getEuroRate } from "@/actions/rates";
@@ -11,6 +18,14 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { caracasDateStr, formatCurrency } from "@/lib/format";
+import {
+  currentQuincena,
+  daysUntilCharge,
+  nextQuincena,
+  quincenaLabel,
+  quincenaLongLabel,
+  saleSchedule,
+} from "@/lib/quincenas";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +64,9 @@ export default async function DashboardPage() {
       .limit(6),
     supabase
       .from("sales")
-      .select("total_amount, amount_paid")
+      .select(
+        "total_amount, amount_paid, installment_amount, installments_count, first_charge_date, client_id"
+      )
       .is("deleted_at", null)
       .neq("status", "COMPLETED"),
     supabase
@@ -78,6 +95,28 @@ export default async function DashboardPage() {
     (sum, p) => sum + Number(p.amount),
     0
   );
+
+  // Lo que toca cobrar en esta jornada, y a cuánta gente.
+  const clientesPorCobrar = new Set<string>();
+  let atrasados = 0;
+  let quincenaTotal = 0;
+  for (const sale of openSales ?? []) {
+    const schedule = saleSchedule({
+      total_amount: Number(sale.total_amount),
+      amount_paid: Number(sale.amount_paid),
+      installment_amount: Number(sale.installment_amount),
+      installments_count: sale.installments_count,
+      first_charge_date: sale.first_charge_date,
+    });
+    if (schedule.dueNow <= 0) continue;
+    quincenaTotal += schedule.dueNow;
+    clientesPorCobrar.add(sale.client_id);
+    if (schedule.behind > 0) atrasados += 1;
+  }
+  quincenaTotal = Math.round((quincenaTotal + Number.EPSILON) * 100) / 100;
+
+  const proxima = nextQuincena();
+  const diasParaLaProxima = daysUntilCharge(proxima);
 
   const kpis = [
     {
@@ -110,6 +149,52 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <section>
+        <Link href="/cobranza" className="block">
+          <Card className="border-indigo-200 bg-indigo-50/70 transition-colors hover:bg-indigo-100/70 dark:border-indigo-900 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50">
+            <CardContent className="flex items-center justify-between gap-3 p-5">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-indigo-500 dark:text-indigo-400">
+                  {quincenaLongLabel(currentQuincena())}
+                </p>
+                {quincenaTotal > 0 ? (
+                  <>
+                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(quincenaTotal)}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm text-slate-600 dark:text-slate-400">
+                      por cobrar a {clientesPorCobrar.size} cliente
+                      {clientesPorCobrar.size === 1 ? "" : "s"}
+                      {atrasados > 0 && (
+                        <>
+                          {" · "}
+                          <span className="font-semibold text-red-600 dark:text-red-400">
+                            {atrasados} atrasada{atrasados === 1 ? "" : "s"}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      Todo cobrado
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                      Próximo cobro el {quincenaLabel(proxima)}
+                      {diasParaLaProxima > 0
+                        ? ` · en ${diasParaLaProxima} día${diasParaLaProxima === 1 ? "" : "s"}`
+                        : " · hoy"}
+                    </p>
+                  </>
+                )}
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0 text-indigo-400" />
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+
       <section>
         <RateCard initial={initialRate} />
       </section>
@@ -153,6 +238,16 @@ export default async function DashboardPage() {
             <Link href="/pedidos?nuevo=1">+ Anotar pedido</Link>
           </Button>
         </div>
+        <Link
+          href="/reportes"
+          className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50"
+        >
+          <span className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-slate-400" />
+            Reportes
+          </span>
+          <ChevronRight className="h-4 w-4 text-slate-300 dark:text-slate-600" />
+        </Link>
       </section>
 
       <section>

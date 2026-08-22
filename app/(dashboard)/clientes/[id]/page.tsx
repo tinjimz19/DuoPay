@@ -16,6 +16,10 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import {
+  cobranzaBadgeLabel,
+  saleSchedule,
+} from "@/lib/quincenas";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, formatDateTime, normalizePhone } from "@/lib/format";
 import {
@@ -53,7 +57,7 @@ export default async function ClienteDetailPage({
       supabase
         .from("sales")
         .select(
-          "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, payments(id, amount, payment_number, notes, created_at, deleted_at)"
+          "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, first_charge_date, payments(id, amount, payment_number, notes, created_at, deleted_at)"
         )
         .eq("client_id", params.id)
         .is("deleted_at", null)
@@ -76,6 +80,7 @@ export default async function ClienteDetailPage({
     "client_name" | "payments"
   > & {
     payments: PaymentRow[] | null;
+    first_charge_date: string | null;
   })[];
 
   // Un abono en papelera no cuenta ni en el historial ni en el saldo.
@@ -216,6 +221,14 @@ export default async function ClienteDetailPage({
                   ...sale,
                   client_name: client.name,
                   client_phone: client.phone,
+                  cobranza: (() => {
+                    const schedule = saleSchedule(sale);
+                    return {
+                      state: schedule.state,
+                      label: cobranzaBadgeLabel(schedule),
+                      dueNow: schedule.dueNow,
+                    };
+                  })(),
                 }}
               />
             ))}

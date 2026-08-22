@@ -1,16 +1,19 @@
 "use client";
 
-import { BarChart3, Home, Package, ShoppingBag, Users } from "lucide-react";
+import { HandCoins, Home, Package, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
+// Cinco caben en una fila. Cobranza entra porque es la pantalla del día de
+// cobro; Reportes se consulta sentado, así que vive en el menú lateral y en
+// el acceso desde Inicio.
 const items = [
   { href: "/", label: "Inicio", icon: Home },
+  { href: "/cobranza", label: "Cobranza", icon: HandCoins },
   { href: "/ventas", label: "Ventas", icon: ShoppingBag },
   { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/pedidos", label: "Pedidos", icon: Package },
 ];
 

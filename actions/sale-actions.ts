@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { formatCurrency } from "@/lib/format";
+import {
+  chargeDateIso,
+  currentQuincena,
+  nextQuincena,
+  saleSchedule,
+} from "@/lib/quincenas";
 import { zodMessage, type ActionResult } from "@/lib/validation";
 
 const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
@@ -18,6 +24,7 @@ function revalidateSaleViews(clientId?: string | null) {
   revalidatePath("/");
   revalidatePath("/ventas");
   revalidatePath("/clientes");
+  revalidatePath("/cobranza");
   revalidatePath("/reportes");
   if (clientId) {
     revalidatePath(`/clientes/${clientId}`);
@@ -40,6 +47,9 @@ const createSaleSchema = z.object({
     .min(1, "Al menos 1 cuota")
     .max(36, "Máximo 36 cuotas")
     .default(2),
+  // Desde qué jornada de cobro empieza a pagar. El cliente manda la
+  // intención, no la fecha: así no puede llegar una fecha inventada.
+  firstCharge: z.enum(["ESTA", "PROXIMA"]).default("PROXIMA"),
   notes: z.string().max(500).optional().nullable(),
 });
 
@@ -74,6 +84,9 @@ export async function createSale(
       category: values.category,
       total_amount: round2(values.totalAmount),
       installments_count: values.installmentsCount,
+      first_charge_date: chargeDateIso(
+        values.firstCharge === "ESTA" ? currentQuincena() : nextQuincena()
+      ),
       notes: values.notes?.trim() || null,
     })
     .select("id")
@@ -87,6 +100,7 @@ export async function createSale(
   }
 
   revalidateSaleViews(values.clientId);
+  revalidatePath("/cobranza");
   revalidatePath("/ventas/nueva");
 
   return { success: true, id: data.id };
@@ -184,6 +198,161 @@ export async function recordPayment(
   revalidateSaleViews(sale.client_id);
 
   return { success: true, amount, clamped: amount < requested };
+}
+
+// ------------------------------------------------------------------
+// Cobro de la quincena
+//
+// El monto NO viaja desde el navegador: el servidor mira la venta, calcula
+// qué le toca poner en esta jornada de cobro (arrastres incluidos) y registra
+// eso. Un toque en la pantalla de Cobranza y listo.
+// ------------------------------------------------------------------
+
+async function chargeQuincena(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  saleId: string
+): Promise<{ amount: number; clientId: string | null }> {
+  const { data: sale } = await supabase
+    .from("sales")
+    .select(
+      "id, client_id, total_amount, amount_paid, installment_amount, installments_count, first_charge_date"
+    )
+    .eq("id", saleId)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!sale) return { amount: 0, clientId: null };
+
+  const schedule = saleSchedule({
+    total_amount: Number(sale.total_amount),
+    amount_paid: Number(sale.amount_paid),
+    installment_amount: Number(sale.installment_amount),
+    installments_count: sale.installments_count,
+    first_charge_date: sale.first_charge_date,
+  });
+
+  if (schedule.dueNow <= 0) {
+    return { amount: 0, clientId: sale.client_id };
+  }
+
+  const { data: last } = await supabase
+    .from("payments")
+    .select("payment_number")
+    .eq("sale_id", saleId)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .not("payment_number", "is", null)
+    .order("payment_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("payments").insert({
+    user_id: userId,
+    sale_id: saleId,
+    amount: schedule.dueNow,
+    payment_number: (last?.payment_number ?? 0) + 1,
+    notes:
+      schedule.behind > 0
+        ? `Cobro de quincena · incluye ${schedule.behind} atrasada${schedule.behind === 1 ? "" : "s"}`
+        : "Cobro de quincena",
+  });
+
+  if (error) throw new Error(error.message);
+
+  return { amount: schedule.dueNow, clientId: sale.client_id };
+}
+
+/** Registra de un toque lo que esta venta debe poner en la quincena actual. */
+export async function recordQuincenaPayment(
+  saleId: string
+): Promise<ActionResult<{ amount: number }>> {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  if (!z.string().uuid().safeParse(saleId).success) {
+    return { success: false, error: "Venta inválida" };
+  }
+
+  try {
+    const { amount, clientId } = await chargeQuincena(supabase, user.id, saleId);
+
+    if (amount <= 0) {
+      return { success: false, error: "Esta venta no tiene nada que cobrar ahora" };
+    }
+
+    revalidateSaleViews(clientId);
+    return { success: true, amount };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "No se pudo registrar el cobro",
+    };
+  }
+}
+
+/** Cobra de un toque todo lo que un cliente debe poner en esta quincena. */
+export async function recordQuincenaPaymentsForClient(
+  clientId: string
+): Promise<ActionResult<{ amount: number; sales: number }>> {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  if (!z.string().uuid().safeParse(clientId).success) {
+    return { success: false, error: "Cliente inválido" };
+  }
+
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("user_id", user.id)
+    .is("deleted_at", null)
+    .neq("status", "COMPLETED")
+    .order("created_at", { ascending: true });
+
+  let total = 0;
+  let count = 0;
+
+  try {
+    for (const sale of sales ?? []) {
+      const { amount } = await chargeQuincena(supabase, user.id, sale.id);
+      if (amount > 0) {
+        total = round2(total + amount);
+        count += 1;
+      }
+    }
+  } catch (err) {
+    revalidateSaleViews(clientId);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "No se pudo registrar el cobro",
+    };
+  }
+
+  if (count === 0) {
+    return { success: false, error: "Este cliente no tiene nada que poner ahora" };
+  }
+
+  revalidateSaleViews(clientId);
+  return { success: true, amount: total, sales: count };
 }
 
 const updatePaymentSchema = z.object({

@@ -110,6 +110,7 @@ export interface Database {
           updated_at: string;
           deleted_at: string | null;
           deleted_via: string | null;
+          first_charge_date: string | null;
         };
         Insert: {
           id?: string;
@@ -126,6 +127,7 @@ export interface Database {
           updated_at?: string;
           deleted_at?: string | null;
           deleted_via?: string | null;
+          first_charge_date?: string | null;
         };
         Update: {
           id?: string;
@@ -142,6 +144,7 @@ export interface Database {
           updated_at?: string;
           deleted_at?: string | null;
           deleted_via?: string | null;
+          first_charge_date?: string | null;
         };
         Relationships: [
           {

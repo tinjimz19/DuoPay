@@ -3,6 +3,10 @@ import Link from "next/link";
 
 import { SaleList } from "@/components/sales/sale-list";
 import { Button } from "@/components/ui/button";
+import {
+  cobranzaBadgeLabel,
+  saleSchedule,
+} from "@/lib/quincenas";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PaymentRecord,
@@ -18,14 +22,22 @@ export default async function VentasPage() {
     supabase
       .from("sales")
       .select(
-        "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, clients(name, phone), payments(id, amount, payment_number, notes, created_at, deleted_at)"
+        "id, item_description, category, total_amount, amount_paid, installment_amount, installments_count, status, notes, created_at, first_charge_date, clients(name, phone), payments(id, amount, payment_number, notes, created_at, deleted_at)"
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("business_name").maybeSingle(),
   ]);
 
-  const mapped: SaleCardData[] = (sales ?? []).map((s) => ({
+  const mapped: SaleCardData[] = (sales ?? []).map((s) => {
+    const schedule = saleSchedule({
+      total_amount: Number(s.total_amount),
+      amount_paid: Number(s.amount_paid),
+      installment_amount: Number(s.installment_amount),
+      installments_count: s.installments_count,
+      first_charge_date: s.first_charge_date,
+    });
+    return {
     id: s.id,
     item_description: s.item_description,
     category: s.category,
@@ -51,7 +63,13 @@ export default async function VentasPage() {
         (a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ),
-  }));
+    cobranza: {
+      state: schedule.state,
+      label: cobranzaBadgeLabel(schedule),
+      dueNow: schedule.dueNow,
+    },
+    };
+  });
 
   return (
     <div className="space-y-4">

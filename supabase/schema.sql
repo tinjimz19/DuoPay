@@ -517,3 +517,37 @@ CREATE INDEX IF NOT EXISTS idx_payments_sale_active
 -- Para una base que YA tiene datos, ejecuta además
 -- supabase/patch-01-integridad-abonos.sql: cuadra amount_paid con los abonos
 -- existentes y marca el origen de lo que ya está en la papelera.
+
+
+-- 15. COBRANZA POR QUINCENAS
+-- En Venezuela se cobra el 15 y el 1ero. La venta solo guarda desde qué
+-- quincena empieza a cobrarse; cuotas exigibles, atraso y "cuánto toca hoy"
+-- los deriva la app (lib/quincenas.ts).
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS first_charge_date DATE;
+
+DO $$ BEGIN
+  ALTER TABLE public.sales
+    ADD CONSTRAINT sales_first_charge_date_check
+    CHECK (
+      first_charge_date IS NULL
+      OR EXTRACT(DAY FROM first_charge_date) IN (1, 15)
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE public.sales
+  ALTER COLUMN first_charge_date SET DEFAULT (
+    CASE
+      WHEN EXTRACT(DAY FROM (NOW() AT TIME ZONE 'America/Caracas')) < 15
+        THEN (date_trunc('month', NOW() AT TIME ZONE 'America/Caracas')
+              + INTERVAL '14 days')::date
+      ELSE (date_trunc('month', NOW() AT TIME ZONE 'America/Caracas')
+            + INTERVAL '1 month')::date
+    END
+  );
+
+CREATE INDEX IF NOT EXISTS idx_sales_cobranza
+  ON public.sales(user_id, first_charge_date)
+  WHERE deleted_at IS NULL AND status <> 'COMPLETED';
+
+-- Para una base que YA tiene ventas, ejecuta supabase/patch-02-quincenas.sql:
+-- les asigna la quincena que les tocaba según su fecha de creación.

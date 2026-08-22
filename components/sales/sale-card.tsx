@@ -45,6 +45,8 @@ import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
 } from "@/lib/reminders";
+import { COBRANZA_STATE_STYLES, type CobranzaState } from "@/lib/quincenas";
+import { cn } from "@/lib/utils";
 import type { ProductCategory, SaleStatus } from "@/types/database.types";
 
 export interface PaymentRecord {
@@ -69,6 +71,12 @@ export interface SaleCardData {
   client_name: string;
   client_phone?: string | null;
   payments?: PaymentRecord[];
+  /**
+   * Estado de la venta en el ciclo de cobranza. Se calcula en el servidor y
+   * llega listo: si lo calculara aquí, un reloj desfasado en el teléfono
+   * rompería la hidratación.
+   */
+  cobranza?: { state: CobranzaState; label: string; dueNow: number } | null;
 }
 
 function parseAmount(raw: string): number {
@@ -271,6 +279,11 @@ export function SaleCard({
   const nextNumber =
     payments.reduce((max, p) => Math.max(max, p.payment_number ?? 0), 0) + 1;
   const suggested = Math.min(Number(sale.installment_amount), remaining);
+  // Si la quincena trae arrastre, el botón grande cobra eso y no una cuota.
+  const quincenaDue =
+    sale.cobranza && sale.cobranza.dueNow > 0
+      ? Math.min(sale.cobranza.dueNow, remaining)
+      : null;
 
   function handleDelete() {
     if (!confirmingDelete) {
@@ -319,7 +332,7 @@ export function SaleCard({
 
   const parsedCustom = parseAmount(customAmount);
 
-  const suggestedBs = euroRate ? suggested * euroRate : null;
+  const suggestedBs = euroRate ? (quincenaDue ?? suggested) * euroRate : null;
   const customBs =
     euroRate && Number.isFinite(parsedCustom) && parsedCustom > 0
       ? parsedCustom * euroRate
@@ -360,11 +373,26 @@ export function SaleCard({
                 value={percent}
                 className="h-2 bg-slate-200 dark:bg-slate-800"
               />
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                {sale.installments_count} cuota
-                {sale.installments_count > 1 ? "s" : ""} ·{" "}
-                {formatCurrency(Number(sale.installment_amount))} c/u
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {sale.installments_count} quincena
+                  {sale.installments_count > 1 ? "s" : ""} ·{" "}
+                  {formatCurrency(Number(sale.installment_amount))} c/u
+                </p>
+                {sale.cobranza && sale.cobranza.state !== "SALDADO" && (
+                  <span
+                    className={cn(
+                      "rounded-md border px-1.5 py-0.5 text-[11px] font-medium",
+                      COBRANZA_STATE_STYLES[sale.cobranza.state]
+                    )}
+                  >
+                    {sale.cobranza.label}
+                    {sale.cobranza.dueNow > 0
+                      ? ` · ${formatCurrency(sale.cobranza.dueNow)}`
+                      : ""}
+                  </span>
+                )}
+              </div>
             </div>
           </button>
         </DialogTrigger>
@@ -412,10 +440,12 @@ export function SaleCard({
                 type="button"
                 className="h-12 w-full text-sm"
                 disabled={pending}
-                onClick={() => handlePay(suggested)}
+                onClick={() => handlePay(quincenaDue ?? suggested)}
               >
                 {pending && <Loader2 className="animate-spin" />}
-                Abonar cuota {nextNumber} · {formatCurrency(suggested)}
+                {quincenaDue
+                  ? `Cobrar la quincena · ${formatCurrency(quincenaDue)}`
+                  : `Abonar cuota ${nextNumber} · ${formatCurrency(suggested)}`}
               </Button>
               {suggestedBs != null && (
                 <p className="-mt-3 text-center text-xs text-slate-500 dark:text-slate-400">

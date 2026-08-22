@@ -46,12 +46,23 @@ const saleSchema = z.object({
       (v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 36,
       "Entre 1 y 36 cuotas"
     ),
+  firstCharge: z.enum(["ESTA", "PROXIMA"]),
   notes: z.string().optional(),
 });
 
 type SaleValues = z.infer<typeof saleSchema>;
 
-export function NewSaleForm({ clients }: { clients: { id: string; name: string }[] }) {
+export function NewSaleForm({
+  clients,
+  estaQuincena,
+  proximaQuincena,
+}: {
+  clients: { id: string; name: string }[];
+  /** Etiqueta de la jornada de cobro vigente, ej. "15 de ago". */
+  estaQuincena: string;
+  /** Etiqueta de la siguiente, ej. "1 de sep". */
+  proximaQuincena: string;
+}) {
   const router = useRouter();
   const [clientOptions, setClientOptions] = React.useState(clients);
   const [loading, setLoading] = React.useState(false);
@@ -64,6 +75,7 @@ export function NewSaleForm({ clients }: { clients: { id: string; name: string }
       category: "ROPA",
       totalAmount: "",
       installmentsCount: "2",
+      firstCharge: "PROXIMA",
       notes: "",
     },
   });
@@ -204,7 +216,7 @@ export function NewSaleForm({ clients }: { clients: { id: string; name: string }
             name="installmentsCount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>N° de cuotas</FormLabel>
+                <FormLabel>N° de quincenas</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -224,13 +236,60 @@ export function NewSaleForm({ clients }: { clients: { id: string; name: string }
         {installmentAmount !== null && (
           <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-800 dark:bg-sky-950/40">
             <span className="text-sky-700 dark:text-sky-300">
-              Valor referencial por cuota:{" "}
+              Cada quincena pone:{" "}
               <span className="font-bold">
                 {formatCurrency(installmentAmount)}
               </span>
             </span>
           </div>
         )}
+
+        <FormField
+          control={form.control}
+          name="firstCharge"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Primer cobro</FormLabel>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    value: "PROXIMA" as const,
+                    title: proximaQuincena,
+                    hint: "La próxima quincena",
+                  },
+                  {
+                    value: "ESTA" as const,
+                    title: estaQuincena,
+                    hint: "Esta misma quincena",
+                  },
+                ].map((option) => {
+                  const active = field.value === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => field.onChange(option.value)}
+                      aria-pressed={active}
+                      className={
+                        active
+                          ? "rounded-lg border-2 border-indigo-500 bg-indigo-50 p-3 text-left dark:bg-indigo-950/40"
+                          : "rounded-lg border border-slate-200 p-3 text-left hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                      }
+                    >
+                      <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {option.title}
+                      </span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">
+                        {option.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

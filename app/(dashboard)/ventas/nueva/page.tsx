@@ -7,6 +7,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  currentQuincena,
+  nextQuincena,
+  quincenaLabel,
+} from "@/lib/quincenas";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +32,15 @@ export default async function NuevaVentaPage() {
         <CardHeader>
           <CardTitle>Registrar entrega a fiado</CardTitle>
           <CardDescription>
-            La venta queda por cobrar en cuotas configurables.
+            Cada cuota es una quincena: se cobra el 15 y el 1ero.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <NewSaleForm clients={clients ?? []} />
+          <NewSaleForm
+            clients={clients ?? []}
+            estaQuincena={quincenaLabel(currentQuincena())}
+            proximaQuincena={quincenaLabel(nextQuincena())}
+          />
         </CardContent>
       </Card>
     </div>
