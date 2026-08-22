@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import {
   cobranzaBadgeLabel,
+  quincenaLabelForDate,
   saleSchedule,
 } from "@/lib/quincenas";
 import { createClient } from "@/lib/supabase/server";
@@ -258,12 +259,14 @@ export default async function ClienteDetailPage({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                       {p.payment_number
-                        ? `Cuota ${p.payment_number}`
+                        ? `Abono ${p.payment_number}`
                         : "Abono"}
                       {p.notes ? ` · ${p.notes}` : ""}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {p.sale.item_description} · {formatDateTime(p.created_at)}
+                      {p.sale.item_description} · quincena del{" "}
+                      {quincenaLabelForDate(p.created_at)} ·{" "}
+                      {formatDateTime(p.created_at)}
                     </p>
                   </div>
                   <p className="shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">

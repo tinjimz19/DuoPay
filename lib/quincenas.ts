@@ -108,6 +108,15 @@ export function quincenaLongLabel(index: number): string {
   return `Quincena del ${day} de ${MESES_LARGOS[month - 1]}`;
 }
 
+/**
+ * En qué jornada de cobro cayó una fecha. Sirve para etiquetar un abono ya
+ * registrado: no depende de "ahora", así que es estable entre servidor y
+ * navegador.
+ */
+export function quincenaLabelForDate(iso: string | Date): string {
+  return quincenaLabel(currentQuincena(new Date(iso)));
+}
+
 /** Días que faltan para que se cobre una quincena (0 = hoy o ya pasó). */
 export function daysUntilCharge(index: number, now: Date = new Date()): number {
   const target = Date.parse(`${chargeDateIso(index)}T00:00:00-04:00`);

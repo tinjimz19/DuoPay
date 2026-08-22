@@ -256,7 +256,7 @@ export function TrashList({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900 dark:text-slate-100">
                     {payment.payment_number
-                      ? `Cuota ${payment.payment_number}`
+                      ? `Abono ${payment.payment_number}`
                       : "Abono"}{" "}
                     · {formatCurrency(payment.amount)}
                   </p>

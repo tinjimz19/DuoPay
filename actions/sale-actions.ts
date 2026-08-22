@@ -211,7 +211,12 @@ export async function recordPayment(
 async function chargeQuincena(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-  saleId: string
+  saleId: string,
+  /**
+   * Adelanto: el cliente llega con la plata antes de que le toque. Se cobra
+   * una cuota aunque la jornada todavía no le exija nada.
+   */
+  advance = false
 ): Promise<{ amount: number; clientId: string | null }> {
   const { data: sale } = await supabase
     .from("sales")
@@ -233,7 +238,13 @@ async function chargeQuincena(
     first_charge_date: sale.first_charge_date,
   });
 
-  if (schedule.dueNow <= 0) {
+  let amount = schedule.dueNow;
+
+  if (amount <= 0 && advance && schedule.remaining > 0) {
+    amount = Math.min(Number(sale.installment_amount), schedule.remaining);
+  }
+
+  if (amount <= 0) {
     return { amount: 0, clientId: sale.client_id };
   }
 
@@ -251,17 +262,19 @@ async function chargeQuincena(
   const { error } = await supabase.from("payments").insert({
     user_id: userId,
     sale_id: saleId,
-    amount: schedule.dueNow,
+    amount,
     payment_number: (last?.payment_number ?? 0) + 1,
     notes:
-      schedule.behind > 0
-        ? `Cobro de quincena · incluye ${schedule.behind} atrasada${schedule.behind === 1 ? "" : "s"}`
-        : "Cobro de quincena",
+      schedule.dueNow <= 0
+        ? "Adelanto"
+        : schedule.behind > 0
+          ? `Cobro de quincena · incluye ${schedule.behind} atrasada${schedule.behind === 1 ? "" : "s"}`
+          : "Cobro de quincena",
   });
 
   if (error) throw new Error(error.message);
 
-  return { amount: schedule.dueNow, clientId: sale.client_id };
+  return { amount, clientId: sale.client_id };
 }
 
 /** Registra de un toque lo que esta venta debe poner en la quincena actual. */
@@ -296,6 +309,50 @@ export async function recordQuincenaPayment(
     return {
       success: false,
       error: err instanceof Error ? err.message : "No se pudo registrar el cobro",
+    };
+  }
+}
+
+/**
+ * Cobra una cuota por adelantado, aunque a la venta todavía no le toque.
+ * Para cuando el cliente aparece con la plata antes de tiempo.
+ */
+export async function recordAdvancePayment(
+  saleId: string
+): Promise<ActionResult<{ amount: number }>> {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  if (!z.string().uuid().safeParse(saleId).success) {
+    return { success: false, error: "Venta inválida" };
+  }
+
+  try {
+    const { amount, clientId } = await chargeQuincena(
+      supabase,
+      user.id,
+      saleId,
+      true
+    );
+
+    if (amount <= 0) {
+      return { success: false, error: "Esta venta ya está saldada" };
+    }
+
+    revalidateSaleViews(clientId);
+    return { success: true, amount };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "No se pudo registrar el adelanto",
     };
   }
 }

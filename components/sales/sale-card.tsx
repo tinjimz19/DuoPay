@@ -45,7 +45,11 @@ import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
 } from "@/lib/reminders";
-import { COBRANZA_STATE_STYLES, type CobranzaState } from "@/lib/quincenas";
+import {
+  COBRANZA_STATE_STYLES,
+  quincenaLabelForDate,
+  type CobranzaState,
+} from "@/lib/quincenas";
 import { cn } from "@/lib/utils";
 import type { ProductCategory, SaleStatus } from "@/types/database.types";
 
@@ -193,10 +197,13 @@ function PaymentRow({
     <div className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-slate-700 dark:text-slate-300">
-          {payment.payment_number ? `Cuota ${payment.payment_number}` : "Abono"}
+          {/* Es el número de ABONO, no la cuota del plan: dos abonos pueden
+              estar cerrando entre los dos una sola quincena. */}
+          {payment.payment_number ? `Abono ${payment.payment_number}` : "Abono"}
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
         <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+          Quincena del {quincenaLabelForDate(payment.created_at)} ·{" "}
           {formatDateTime(payment.created_at)}
         </p>
       </div>
@@ -274,10 +281,6 @@ export function SaleCard({
   const percent = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
   const payments = sale.payments ?? [];
 
-  // Siguiente cuota = la mayor registrada + 1. Contar filas repetiría un
-  // número si se borró un abono intermedio.
-  const nextNumber =
-    payments.reduce((max, p) => Math.max(max, p.payment_number ?? 0), 0) + 1;
   const suggested = Math.min(Number(sale.installment_amount), remaining);
   // Si la quincena trae arrastre, el botón grande cobra eso y no una cuota.
   const quincenaDue =
@@ -445,7 +448,9 @@ export function SaleCard({
                 {pending && <Loader2 className="animate-spin" />}
                 {quincenaDue
                   ? `Cobrar la quincena · ${formatCurrency(quincenaDue)}`
-                  : `Abonar cuota ${nextNumber} · ${formatCurrency(suggested)}`}
+                  : sale.cobranza?.state === "POR_EMPEZAR"
+                    ? `Adelantar cuota · ${formatCurrency(suggested)}`
+                    : `Abonar cuota · ${formatCurrency(suggested)}`}
               </Button>
               {suggestedBs != null && (
                 <p className="-mt-3 text-center text-xs text-slate-500 dark:text-slate-400">

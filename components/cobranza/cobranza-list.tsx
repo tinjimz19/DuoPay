@@ -14,6 +14,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import {
+  recordAdvancePayment,
   recordQuincenaPayment,
   recordQuincenaPaymentsForClient,
 } from "@/actions/sale-actions";
@@ -33,6 +34,8 @@ export interface CobranzaSaleRow {
   description: string;
   category: ProductCategory;
   dueNow: number;
+  /** Cuota que se le puede cobrar por adelantado cuando no le toca nada. */
+  advanceAmount: number;
   remaining: number;
   behind: number;
   state: CobranzaState;
@@ -45,6 +48,7 @@ export interface CobranzaClient {
   name: string;
   phone: string;
   dueNow: number;
+  advanceNow: number;
   remaining: number;
   behind: number;
   sales: CobranzaSaleRow[];
@@ -70,6 +74,7 @@ function ClientCard({
   const [pending, startTransition] = React.useTransition();
 
   const cobrables = client.sales.filter((s) => s.dueNow > 0);
+  const adelantables = client.sales.filter((s) => s.advanceAmount > 0);
 
   function cobrarTodo() {
     startTransition(async () => {
@@ -77,6 +82,20 @@ function ClientCard({
       if (res.success) {
         toast.success(
           `Cobrado ${formatCurrency(res.amount)} a ${client.name}`
+        );
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function adelantarVenta(saleId: string, description: string) {
+    startTransition(async () => {
+      const res = await recordAdvancePayment(saleId);
+      if (res.success) {
+        toast.success(
+          `Adelanto de ${formatCurrency(res.amount)} · ${description}`
         );
         router.refresh();
       } else {
@@ -138,7 +157,9 @@ function ClientCard({
                   {atrasoLabel(client.behind)}
                 </span>
               ) : tone === "aldia" ? (
-                "Al día · nada que poner ahora"
+                adelantables.length > 0
+                  ? "Al día · puede adelantar"
+                  : "Al día · nada que poner ahora"
               ) : (
                 `${client.sales.length} venta${client.sales.length === 1 ? "" : "s"} abierta${client.sales.length === 1 ? "" : "s"}`
               )}
@@ -161,6 +182,33 @@ function ClientCard({
             </p>
           </div>
         </div>
+
+        {cobrables.length === 0 && adelantables.length > 0 && (
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full text-sm"
+              disabled={pending}
+              onClick={() => {
+                // Con una sola venta no tiene sentido hacerlo desplegar.
+                if (adelantables.length === 1) {
+                  adelantarVenta(
+                    adelantables[0].id,
+                    adelantables[0].description
+                  );
+                } else {
+                  setOpen(true);
+                }
+              }}
+            >
+              {pending && <Loader2 className="animate-spin" />}
+              {adelantables.length === 1
+                ? `Adelantar ${formatCurrency(adelantables[0].advanceAmount)}`
+                : "Adelantar una cuota"}
+            </Button>
+          </div>
+        )}
 
         {cobrables.length > 0 && (
           <div className="mt-3 flex gap-2">
@@ -242,6 +290,17 @@ function ClientCard({
                         onClick={() => cobrarVenta(sale.id, sale.description)}
                       >
                         {formatCurrency(sale.dueNow)}
+                      </Button>
+                    ) : sale.advanceAmount > 0 ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 shrink-0 text-xs text-indigo-600 dark:text-indigo-400"
+                        disabled={pending}
+                        onClick={() => adelantarVenta(sale.id, sale.description)}
+                      >
+                        Adelantar {formatCurrency(sale.advanceAmount)}
                       </Button>
                     ) : (
                       <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">

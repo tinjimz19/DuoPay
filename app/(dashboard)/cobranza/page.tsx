@@ -68,11 +68,18 @@ export default async function CobranzaPage() {
 
     if (schedule.state === "SALDADO") continue;
 
+    // Si no le toca nada pero queda saldo, se le puede adelantar una cuota.
+    const advanceAmount =
+      schedule.dueNow <= 0 && schedule.remaining > 0
+        ? Math.min(Number(raw.installment_amount), schedule.remaining)
+        : 0;
+
     const row: CobranzaSaleRow = {
       id: raw.id,
       description: raw.item_description,
       category: raw.category,
       dueNow: schedule.dueNow,
+      advanceAmount,
       remaining: schedule.remaining,
       behind: schedule.behind,
       state: schedule.state,
@@ -87,6 +94,7 @@ export default async function CobranzaPage() {
     if (entry) {
       entry.sales.push(row);
       entry.dueNow += row.dueNow;
+      entry.advanceNow += row.advanceAmount;
       entry.remaining += row.remaining;
       entry.behind = Math.max(entry.behind, row.behind);
     } else {
@@ -95,6 +103,7 @@ export default async function CobranzaPage() {
         name: client.name,
         phone: client.phone,
         dueNow: row.dueNow,
+        advanceNow: row.advanceAmount,
         remaining: row.remaining,
         behind: row.behind,
         sales: [row],
@@ -105,6 +114,7 @@ export default async function CobranzaPage() {
   const clients = Array.from(byClient.values()).map((c) => ({
     ...c,
     dueNow: Math.round((c.dueNow + Number.EPSILON) * 100) / 100,
+    advanceNow: Math.round((c.advanceNow + Number.EPSILON) * 100) / 100,
     remaining: Math.round((c.remaining + Number.EPSILON) * 100) / 100,
   }));
 

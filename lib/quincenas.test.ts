@@ -6,8 +6,16 @@
  * No tocan la base de datos: son puro cálculo. Si algo se rompe, lanza.
  */
 import {
-  currentQuincena, chargeDateIso, quincenaFromChargeDate, quincenaLabel,
-  quincenaIndex, saleSchedule, cobranzaBadgeLabel, daysUntilCharge,
+  chargeDateIso,
+  cobranzaBadgeLabel,
+  currentQuincena,
+  daysUntilCharge,
+  quincenaFromChargeDate,
+  quincenaIndex,
+  quincenaLabel,
+  quincenaLabelForDate,
+  saleSchedule,
+  type SaleForSchedule,
 } from "@/lib/quincenas";
 
 let fails = 0;
@@ -82,6 +90,34 @@ s = saleSchedule(venta(0, "2026-08-15"), at("2027-08-20"));
 eq("un año entero sin pagar", [s.state, s.behind, s.dueNow], ["ATRASADO", 24, 100]);
 s = saleSchedule({ total_amount: 80, amount_paid: 20, installment_amount: 20, installments_count: 4, first_charge_date: null }, at("2026-08-22"));
 eq("venta vieja sin quincena asignada no sale atrasada", [s.state, s.behind], ["AL_DIA", 0]);
+
+console.log("--- etiqueta de la jornada en que cayó un abono ---");
+eq("abono del 22 ago", quincenaLabelForDate("2026-08-22T15:00:00-04:00"), "15 de ago");
+eq("abono del 3 sep",  quincenaLabelForDate("2026-09-03T09:00:00-04:00"), "1 de sep");
+eq("abono del 14 ago", quincenaLabelForDate("2026-08-14T23:00:00-04:00"), "1 de ago");
+eq("abono del 2 ene",  quincenaLabelForDate("2027-01-02T09:00:00-04:00"), "1 de ene");
+
+console.log("\n--- monto que ofrece el botón Adelantar (misma fórmula que el server) ---");
+const ventaN = (paid: number, count: number, total: number, first: string) => ({
+  total_amount: total, amount_paid: paid,
+  installment_amount: Math.round((total / count) * 100) / 100,
+  installments_count: count, first_charge_date: first,
+});
+function adelanto(v: SaleForSchedule & { installment_amount: number }, dia: string) {
+  const s = saleSchedule(v, at(dia));
+  return s.dueNow <= 0 && s.remaining > 0
+    ? Math.min(v.installment_amount, s.remaining) : 0;
+}
+// venta que aún no arranca: el hueco que estábamos tapando
+eq("no arrancada, ofrece 1 cuota", adelanto(ventaN(0, 2, 100, "2026-09-01"), "2026-08-22"), 50);
+// ya adelantó dos quincenas: puede seguir adelantando la tercera
+eq("ya al día, ofrece la siguiente", adelanto(ventaN(100, 3, 150, "2026-08-15"), "2026-09-02"), 50);
+// última cuota: no ofrece más que el saldo
+eq("no ofrece más que el saldo", adelanto(ventaN(130, 3, 150, "2026-08-15"), "2026-08-16"), 20);
+// si le toca pagar, no es adelanto
+eq("si le toca, no hay adelanto", adelanto(ventaN(0, 2, 100, "2026-08-15"), "2026-08-22"), 0);
+// saldada
+eq("saldada no ofrece nada", adelanto(ventaN(100, 2, 100, "2026-08-15"), "2026-08-22"), 0);
 
 console.log(fails === 0 ? "\n=== TODO PASÓ ===" : `\n=== ${fails} FALLOS ===`);
 if (fails > 0) throw new Error("hubo fallos");
