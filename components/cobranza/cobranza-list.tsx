@@ -4,20 +4,16 @@ import {
   CheckCircle2,
   ChevronDown,
   HandCoins,
-  Loader2,
   MessageCircle,
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import * as React from "react";
-import { toast } from "sonner";
 
 import {
-  recordAdvancePayment,
-  recordQuincenaPayment,
-  recordQuincenaPaymentsForClient,
-} from "@/actions/sale-actions";
+  CobrarDialog,
+  type CobrarRow,
+} from "@/components/cobranza/cobrar-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
@@ -69,50 +65,24 @@ function ClientCard({
   quincenaLabel: string;
   tone: "atrasado" | "toca" | "aldia";
 }) {
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [pending, startTransition] = React.useTransition();
+  const [dialog, setDialog] = React.useState<{
+    rows: CobrarRow[];
+    kind: "COBRO" | "ADELANTO";
+  } | null>(null);
 
   const cobrables = client.sales.filter((s) => s.dueNow > 0);
   const adelantables = client.sales.filter((s) => s.advanceAmount > 0);
 
-  function cobrarTodo() {
-    startTransition(async () => {
-      const res = await recordQuincenaPaymentsForClient(client.id);
-      if (res.success) {
-        toast.success(
-          `Cobrado ${formatCurrency(res.amount)} a ${client.name}`
-        );
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    });
-  }
-
-  function adelantarVenta(saleId: string, description: string) {
-    startTransition(async () => {
-      const res = await recordAdvancePayment(saleId);
-      if (res.success) {
-        toast.success(
-          `Adelanto de ${formatCurrency(res.amount)} · ${description}`
-        );
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    });
-  }
-
-  function cobrarVenta(saleId: string, description: string) {
-    startTransition(async () => {
-      const res = await recordQuincenaPayment(saleId);
-      if (res.success) {
-        toast.success(`Cobrado ${formatCurrency(res.amount)} · ${description}`);
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
+  function abrirCobro(sales: CobranzaSaleRow[], kind: "COBRO" | "ADELANTO") {
+    setDialog({
+      kind,
+      rows: sales.map((s) => ({
+        saleId: s.id,
+        description: s.description,
+        suggested: kind === "ADELANTO" ? s.advanceAmount : s.dueNow,
+        remaining: s.remaining,
+      })),
     });
   }
 
@@ -189,23 +159,11 @@ function ClientCard({
               type="button"
               variant="outline"
               className="h-10 w-full text-sm"
-              disabled={pending}
-              onClick={() => {
-                // Con una sola venta no tiene sentido hacerlo desplegar.
-                if (adelantables.length === 1) {
-                  adelantarVenta(
-                    adelantables[0].id,
-                    adelantables[0].description
-                  );
-                } else {
-                  setOpen(true);
-                }
-              }}
+              onClick={() => abrirCobro(adelantables, "ADELANTO")}
             >
-              {pending && <Loader2 className="animate-spin" />}
               {adelantables.length === 1
-                ? `Adelantar ${formatCurrency(adelantables[0].advanceAmount)}`
-                : "Adelantar una cuota"}
+                ? `Adelantar ${formatCurrency(adelantables[0].advanceAmount)}…`
+                : "Adelantar…"}
             </Button>
           </div>
         )}
@@ -215,15 +173,10 @@ function ClientCard({
             <Button
               type="button"
               className="h-11 flex-1 text-sm"
-              disabled={pending}
-              onClick={cobrarTodo}
+              onClick={() => abrirCobro(cobrables, "COBRO")}
             >
-              {pending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <HandCoins className="h-4 w-4" />
-              )}
-              Cobrar {formatCurrency(client.dueNow)}
+              <HandCoins className="h-4 w-4" />
+              Cobrar {formatCurrency(client.dueNow)}…
             </Button>
             {waUrl && (
               <Button
@@ -286,10 +239,9 @@ function ClientCard({
                         size="sm"
                         variant="outline"
                         className="h-9 shrink-0 text-xs"
-                        disabled={pending}
-                        onClick={() => cobrarVenta(sale.id, sale.description)}
+                        onClick={() => abrirCobro([sale], "COBRO")}
                       >
-                        {formatCurrency(sale.dueNow)}
+                        {formatCurrency(sale.dueNow)}…
                       </Button>
                     ) : sale.advanceAmount > 0 ? (
                       <Button
@@ -297,10 +249,9 @@ function ClientCard({
                         size="sm"
                         variant="ghost"
                         className="h-9 shrink-0 text-xs text-indigo-600 dark:text-indigo-400"
-                        disabled={pending}
-                        onClick={() => adelantarVenta(sale.id, sale.description)}
+                        onClick={() => abrirCobro([sale], "ADELANTO")}
                       >
-                        Adelantar {formatCurrency(sale.advanceAmount)}
+                        Adelantar {formatCurrency(sale.advanceAmount)}…
                       </Button>
                     ) : (
                       <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
@@ -314,6 +265,16 @@ function ClientCard({
           </>
         )}
       </CardContent>
+
+      {dialog && (
+        <CobrarDialog
+          open
+          onOpenChange={(v) => !v && setDialog(null)}
+          clientName={client.name}
+          rows={dialog.rows}
+          kind={dialog.kind}
+        />
+      )}
     </Card>
   );
 }

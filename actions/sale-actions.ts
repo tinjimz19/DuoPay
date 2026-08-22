@@ -9,9 +9,12 @@ import {
   chargeDateIso,
   currentQuincena,
   nextQuincena,
-  saleSchedule,
 } from "@/lib/quincenas";
-import { zodMessage, type ActionResult } from "@/lib/validation";
+import {
+  dbErrorMessage,
+  zodMessage,
+  type ActionResult,
+} from "@/lib/validation";
 
 const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
 
@@ -95,7 +98,7 @@ export async function createSale(
   if (error || !data) {
     return {
       success: false,
-      error: error?.message ?? "No se pudo registrar la venta",
+      error: error ? dbErrorMessage(error.message) : "No se pudo registrar la venta",
     };
   }
 
@@ -145,16 +148,52 @@ export async function recordPayment(
     return { success: false, error: "No autorizado" };
   }
 
-  const { data: sale, error: saleError } = await supabase
+  const result = await insertPayment(
+    supabase,
+    user.id,
+    values.saleId,
+    values.amount,
+    values.notes ?? null
+  );
+
+  if ("error" in result) {
+    return { success: false, error: result.error };
+  }
+
+  revalidateSaleViews(result.clientId);
+
+  return {
+    success: true,
+    amount: result.amount,
+    clamped: result.clamped,
+  };
+}
+
+/**
+ * Inserta un abono contra una venta, recortado al saldo pendiente.
+ * El número de abono se calcula aquí y no en el cliente: si se borró uno
+ * intermedio, contar filas repetiría un número ya usado.
+ */
+async function insertPayment(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  saleId: string,
+  requestedAmount: number,
+  notes: string | null
+): Promise<
+  | { amount: number; clamped: boolean; clientId: string | null }
+  | { error: string }
+> {
+  const { data: sale } = await supabase
     .from("sales")
-    .select("id, client_id, total_amount, amount_paid, status")
-    .eq("id", values.saleId)
-    .eq("user_id", user.id)
+    .select("id, client_id, total_amount, amount_paid")
+    .eq("id", saleId)
+    .eq("user_id", userId)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (saleError || !sale) {
-    return { success: false, error: "Venta no encontrada" };
+  if (!sale) {
+    return { error: "Venta no encontrada" };
   }
 
   const remaining = round2(
@@ -162,91 +201,11 @@ export async function recordPayment(
   );
 
   if (remaining <= 0) {
-    return { success: false, error: "Esta venta ya está saldada" };
+    return { error: "Esta venta ya está saldada" };
   }
 
-  const requested = round2(values.amount);
+  const requested = round2(requestedAmount);
   const amount = Math.min(requested, remaining);
-
-  // El número de cuota se calcula aquí, no en el cliente: si se borró un
-  // abono intermedio, contar filas repetiría un número ya usado.
-  const { data: last } = await supabase
-    .from("payments")
-    .select("payment_number")
-    .eq("sale_id", values.saleId)
-    .eq("user_id", user.id)
-    .is("deleted_at", null)
-    .not("payment_number", "is", null)
-    .order("payment_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const paymentNumber = (last?.payment_number ?? 0) + 1;
-
-  const { error: paymentError } = await supabase.from("payments").insert({
-    user_id: user.id,
-    sale_id: values.saleId,
-    amount,
-    payment_number: paymentNumber,
-    notes: values.notes?.trim() || null,
-  });
-
-  if (paymentError) {
-    return { success: false, error: paymentError.message };
-  }
-
-  revalidateSaleViews(sale.client_id);
-
-  return { success: true, amount, clamped: amount < requested };
-}
-
-// ------------------------------------------------------------------
-// Cobro de la quincena
-//
-// El monto NO viaja desde el navegador: el servidor mira la venta, calcula
-// qué le toca poner en esta jornada de cobro (arrastres incluidos) y registra
-// eso. Un toque en la pantalla de Cobranza y listo.
-// ------------------------------------------------------------------
-
-async function chargeQuincena(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  saleId: string,
-  /**
-   * Adelanto: el cliente llega con la plata antes de que le toque. Se cobra
-   * una cuota aunque la jornada todavía no le exija nada.
-   */
-  advance = false
-): Promise<{ amount: number; clientId: string | null }> {
-  const { data: sale } = await supabase
-    .from("sales")
-    .select(
-      "id, client_id, total_amount, amount_paid, installment_amount, installments_count, first_charge_date"
-    )
-    .eq("id", saleId)
-    .eq("user_id", userId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (!sale) return { amount: 0, clientId: null };
-
-  const schedule = saleSchedule({
-    total_amount: Number(sale.total_amount),
-    amount_paid: Number(sale.amount_paid),
-    installment_amount: Number(sale.installment_amount),
-    installments_count: sale.installments_count,
-    first_charge_date: sale.first_charge_date,
-  });
-
-  let amount = schedule.dueNow;
-
-  if (amount <= 0 && advance && schedule.remaining > 0) {
-    amount = Math.min(Number(sale.installment_amount), schedule.remaining);
-  }
-
-  if (amount <= 0) {
-    return { amount: 0, clientId: sale.client_id };
-  }
 
   const { data: last } = await supabase
     .from("payments")
@@ -264,23 +223,61 @@ async function chargeQuincena(
     sale_id: saleId,
     amount,
     payment_number: (last?.payment_number ?? 0) + 1,
-    notes:
-      schedule.dueNow <= 0
-        ? "Adelanto"
-        : schedule.behind > 0
-          ? `Cobro de quincena · incluye ${schedule.behind} atrasada${schedule.behind === 1 ? "" : "s"}`
-          : "Cobro de quincena",
+    notes: notes?.trim() || null,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    return { error: dbErrorMessage(error.message) };
+  }
 
-  return { amount, clientId: sale.client_id };
+  return { amount, clamped: amount < requested, clientId: sale.client_id };
 }
 
-/** Registra de un toque lo que esta venta debe poner en la quincena actual. */
-export async function recordQuincenaPayment(
-  saleId: string
-): Promise<ActionResult<{ amount: number }>> {
+// ------------------------------------------------------------------
+// Cobro de la quincena
+//
+// La pantalla de Cobranza propone el monto (lo calcula el servidor al pintar
+// la lista), pero el cobro pasa siempre por un diálogo donde se puede ajustar:
+// en la calle la gente abona lo que trae, no la cuota exacta.
+// Cada monto se recorta al saldo de su venta, así nadie sobrepaga.
+// ------------------------------------------------------------------
+
+const paymentKindSchema = z.enum(["COBRO", "ADELANTO", "ABONO"]);
+
+const KIND_NOTE: Record<z.infer<typeof paymentKindSchema>, string> = {
+  COBRO: "Cobro de quincena",
+  ADELANTO: "Adelanto",
+  ABONO: "Abono",
+};
+
+const batchSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        saleId: z.string().uuid(),
+        amount: z.coerce
+          .number({ message: "Monto inválido" })
+          .positive("Los montos deben ser mayores a 0"),
+      })
+    )
+    .min(1, "No hay nada que cobrar")
+    .max(30, "Demasiadas ventas a la vez"),
+  kind: paymentKindSchema.default("ABONO"),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export type RecordPaymentsBatchInput = z.infer<typeof batchSchema>;
+
+/** Registra varios abonos de un golpe: lo que se cobra en una visita. */
+export async function recordPaymentsBatch(
+  input: RecordPaymentsBatchInput
+): Promise<ActionResult<{ amount: number; count: number; clamped: boolean }>> {
+  const parsed = batchSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: zodMessage(parsed.error) };
+  }
+  const values = parsed.data;
+
   const supabase = createClient();
 
   const {
@@ -292,124 +289,41 @@ export async function recordQuincenaPayment(
     return { success: false, error: "No autorizado" };
   }
 
-  if (!z.string().uuid().safeParse(saleId).success) {
-    return { success: false, error: "Venta inválida" };
-  }
-
-  try {
-    const { amount, clientId } = await chargeQuincena(supabase, user.id, saleId);
-
-    if (amount <= 0) {
-      return { success: false, error: "Esta venta no tiene nada que cobrar ahora" };
-    }
-
-    revalidateSaleViews(clientId);
-    return { success: true, amount };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "No se pudo registrar el cobro",
-    };
-  }
-}
-
-/**
- * Cobra una cuota por adelantado, aunque a la venta todavía no le toque.
- * Para cuando el cliente aparece con la plata antes de tiempo.
- */
-export async function recordAdvancePayment(
-  saleId: string
-): Promise<ActionResult<{ amount: number }>> {
-  const supabase = createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { success: false, error: "No autorizado" };
-  }
-
-  if (!z.string().uuid().safeParse(saleId).success) {
-    return { success: false, error: "Venta inválida" };
-  }
-
-  try {
-    const { amount, clientId } = await chargeQuincena(
-      supabase,
-      user.id,
-      saleId,
-      true
-    );
-
-    if (amount <= 0) {
-      return { success: false, error: "Esta venta ya está saldada" };
-    }
-
-    revalidateSaleViews(clientId);
-    return { success: true, amount };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "No se pudo registrar el adelanto",
-    };
-  }
-}
-
-/** Cobra de un toque todo lo que un cliente debe poner en esta quincena. */
-export async function recordQuincenaPaymentsForClient(
-  clientId: string
-): Promise<ActionResult<{ amount: number; sales: number }>> {
-  const supabase = createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { success: false, error: "No autorizado" };
-  }
-
-  if (!z.string().uuid().safeParse(clientId).success) {
-    return { success: false, error: "Cliente inválido" };
-  }
-
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id")
-    .eq("client_id", clientId)
-    .eq("user_id", user.id)
-    .is("deleted_at", null)
-    .neq("status", "COMPLETED")
-    .order("created_at", { ascending: true });
+  const notes = values.notes?.trim() || KIND_NOTE[values.kind];
 
   let total = 0;
   let count = 0;
+  let clamped = false;
+  let clientId: string | null = null;
+  const fallos: string[] = [];
 
-  try {
-    for (const sale of sales ?? []) {
-      const { amount } = await chargeQuincena(supabase, user.id, sale.id);
-      if (amount > 0) {
-        total = round2(total + amount);
-        count += 1;
-      }
+  for (const item of values.items) {
+    const result = await insertPayment(
+      supabase,
+      user.id,
+      item.saleId,
+      item.amount,
+      notes
+    );
+
+    if ("error" in result) {
+      fallos.push(result.error);
+      continue;
     }
-  } catch (err) {
-    revalidateSaleViews(clientId);
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "No se pudo registrar el cobro",
-    };
-  }
 
-  if (count === 0) {
-    return { success: false, error: "Este cliente no tiene nada que poner ahora" };
+    total = round2(total + result.amount);
+    count += 1;
+    clamped = clamped || result.clamped;
+    clientId = result.clientId ?? clientId;
   }
 
   revalidateSaleViews(clientId);
-  return { success: true, amount: total, sales: count };
+
+  if (count === 0) {
+    return { success: false, error: fallos[0] ?? "No se registró ningún abono" };
+  }
+
+  return { success: true, amount: total, count, clamped };
 }
 
 const updatePaymentSchema = z.object({
@@ -507,7 +421,7 @@ export async function updatePayment(
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidateSaleViews(sale.client_id);
@@ -561,7 +475,7 @@ export async function deletePayment(id: string): Promise<ActionResult> {
     .is("deleted_at", null);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidateSaleViews(clientId);
@@ -626,7 +540,7 @@ export async function restorePayment(id: string): Promise<ActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidateSaleViews(sale.client_id);
@@ -654,7 +568,7 @@ export async function purgePayment(id: string): Promise<ActionResult> {
     .not("deleted_at", "is", null);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidatePath("/papelera");
@@ -697,7 +611,7 @@ export async function deleteSale(id: string): Promise<ActionResult> {
     .is("deleted_at", null);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   await supabase
@@ -762,7 +676,7 @@ export async function restoreSale(id: string): Promise<ActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidateSaleViews(sale.client_id);
@@ -790,7 +704,7 @@ export async function purgeSale(id: string): Promise<ActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidatePath("/papelera");

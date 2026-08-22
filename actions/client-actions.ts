@@ -4,7 +4,11 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { zodMessage, type ActionResult } from "@/lib/validation";
+import {
+  dbErrorMessage,
+  zodMessage,
+  type ActionResult,
+} from "@/lib/validation";
 
 const clientFieldsSchema = {
   name: z.string().min(2, "El nombre es obligatorio").max(120),
@@ -54,7 +58,7 @@ export async function createClient(
   if (error || !data) {
     return {
       success: false,
-      error: error?.message ?? "Error al crear el cliente",
+      error: error ? dbErrorMessage(error.message) : "Error al crear el cliente",
     };
   }
 
@@ -102,7 +106,7 @@ export async function updateClient(
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidatePath("/clientes");
@@ -165,7 +169,7 @@ export async function deleteClient(id: string): Promise<ActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidatePath("/");
@@ -221,7 +225,7 @@ export async function restoreClient(id: string): Promise<ActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidatePath("/");
@@ -253,7 +257,7 @@ export async function purgeClient(id: string): Promise<ActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: dbErrorMessage(error.message) };
   }
 
   revalidatePath("/papelera");
