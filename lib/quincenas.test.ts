@@ -13,6 +13,7 @@ import {
   quincenaFromChargeDate,
   quincenaIndex,
   quincenaLabel,
+  firstChargeOptions,
   quincenaLabelForDate,
   saleSchedule,
   type SaleForSchedule,
@@ -118,6 +119,34 @@ eq("no ofrece más que el saldo", adelanto(ventaN(130, 3, 150, "2026-08-15"), "2
 eq("si le toca, no hay adelanto", adelanto(ventaN(0, 2, 100, "2026-08-15"), "2026-08-22"), 0);
 // saldada
 eq("saldada no ofrece nada", adelanto(ventaN(100, 2, 100, "2026-08-15"), "2026-08-22"), 0);
+
+const resumenFC = (dia: string) =>
+  firstChargeOptions(3, at(dia)).map(
+    (o) => `${o.label} (${o.daysAway === 0 ? "ya" : o.daysAway + "d"})`
+  );
+const fechasFC = (dia: string) =>
+  firstChargeOptions(3, at(dia)).map((o) =>
+    chargeDateIso(currentQuincena(at(dia)) + o.offset)
+  );
+
+console.log("\n=== OPCIONES DE PRIMER COBRO ===");
+console.log("--- estamos en la quincena del 15 de ago (hoy 22 ago) ---");
+eq("las tres opciones", resumenFC("2026-08-22"), ["15 de ago (ya)", "1 de sep (10d)", "15 de sep (24d)"]);
+eq("fechas que guardaría el servidor", fechasFC("2026-08-22"), ["2026-08-15", "2026-09-01", "2026-09-15"]);
+
+console.log("\n--- justo el día de cobro (15 ago) ---");
+eq("opciones", resumenFC("2026-08-15"), ["15 de ago (ya)", "1 de sep (17d)", "15 de sep (31d)"]);
+
+console.log("\n--- antes del 15: la vigente es la del 1ero ---");
+eq("opciones el 3 de ago", resumenFC("2026-08-03"), ["1 de ago (ya)", "15 de ago (12d)", "1 de sep (29d)"]);
+
+console.log("\n--- cruce de año ---");
+eq("opciones el 20 de dic", resumenFC("2026-12-20"), ["15 de dic (ya)", "1 de ene (12d)", "15 de ene (26d)"]);
+eq("fechas el 20 de dic", fechasFC("2026-12-20"), ["2026-12-15", "2027-01-01", "2027-01-15"]);
+
+console.log("\n--- febrero ---");
+eq("opciones el 20 de feb 2027", resumenFC("2027-02-20"), ["15 de feb (ya)", "1 de mar (9d)", "15 de mar (23d)"]);
+
 
 console.log(fails === 0 ? "\n=== TODO PASÓ ===" : `\n=== ${fails} FALLOS ===`);
 if (fails > 0) throw new Error("hubo fallos");

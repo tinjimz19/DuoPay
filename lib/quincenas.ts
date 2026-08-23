@@ -119,6 +119,36 @@ export function daysUntilCharge(index: number, now: Date = new Date()): number {
   return Math.max(0, Math.round((target - today) / 86_400_000));
 }
 
+/** Cuántas jornadas de cobro se ofrecen al registrar una venta. */
+export const FIRST_CHARGE_CHOICES = 3;
+
+export interface FirstChargeOption {
+  /** Quincenas por delante de la vigente: 0 = esta, 1 = la próxima… */
+  offset: number;
+  /** "15 de ago" */
+  label: string;
+  /** Días que faltan para esa jornada; 0 = ya llegó. */
+  daysAway: number;
+}
+
+/**
+ * Desde qué jornada puede empezar a pagar una venta nueva.
+ *
+ * No son solo dos: al cliente que se lleva bastante mercancía hay que poder
+ * darle aire y arrancarle el cobro más adelante.
+ */
+export function firstChargeOptions(
+  count: number = FIRST_CHARGE_CHOICES,
+  now: Date = new Date()
+): FirstChargeOption[] {
+  const current = currentQuincena(now);
+  return Array.from({ length: count }, (_, offset) => ({
+    offset,
+    label: quincenaLabel(current + offset),
+    daysAway: daysUntilCharge(current + offset, now),
+  }));
+}
+
 // ------------------------------------------------------------------
 // Estado de cobranza de una venta
 // ------------------------------------------------------------------

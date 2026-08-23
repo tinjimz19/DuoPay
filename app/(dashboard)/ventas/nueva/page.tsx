@@ -7,11 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  currentQuincena,
-  nextQuincena,
-  quincenaLabel,
-} from "@/lib/quincenas";
+import { firstChargeOptions } from "@/lib/quincenas";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -51,8 +47,7 @@ export default async function NuevaVentaPage() {
               category: p.category,
               stock: Number(p.stock),
             }))}
-            estaQuincena={quincenaLabel(currentQuincena())}
-            proximaQuincena={quincenaLabel(nextQuincena())}
+            firstChargeOptions={firstChargeOptions()}
           />
         </CardContent>
       </Card>

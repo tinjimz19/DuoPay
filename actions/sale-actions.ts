@@ -5,11 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { formatCurrency } from "@/lib/format";
-import {
-  chargeDateIso,
-  currentQuincena,
-  nextQuincena,
-} from "@/lib/quincenas";
+import { chargeDateIso, currentQuincena } from "@/lib/quincenas";
 import { ensureClient } from "@/lib/clients-server";
 import {
   dbErrorMessage,
@@ -56,9 +52,15 @@ const createSaleSchema = z.object({
     .min(1, "Al menos 1 cuota")
     .max(36, "Máximo 36 cuotas")
     .default(2),
-  // Desde qué jornada de cobro empieza a pagar. El cliente manda la
-  // intención, no la fecha: así no puede llegar una fecha inventada.
-  firstCharge: z.enum(["ESTA", "PROXIMA"]).default("PROXIMA"),
+  // Desde qué jornada de cobro empieza a pagar, contada desde la vigente:
+  // 0 = esta, 1 = la próxima, 2 = la de después. Viaja el desplazamiento y
+  // no la fecha, así no puede llegar una fecha inventada.
+  firstChargeOffset: z.coerce
+    .number({ message: "Primer cobro inválido" })
+    .int()
+    .min(0, "Primer cobro inválido")
+    .max(5, "Primer cobro demasiado lejos")
+    .default(1),
   // Qué salió del inventario. Vacío = venta suelta que no mueve stock.
   items: z
     .array(
@@ -155,7 +157,7 @@ export async function createSale(
       total_amount: round2(values.totalAmount),
       installments_count: values.installmentsCount,
       first_charge_date: chargeDateIso(
-        values.firstCharge === "ESTA" ? currentQuincena() : nextQuincena()
+        currentQuincena() + values.firstChargeOffset
       ),
       notes: values.notes?.trim() || null,
     })

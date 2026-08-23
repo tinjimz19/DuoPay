@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CATEGORY_OPTIONS } from "@/lib/labels";
+import type { FirstChargeOption } from "@/lib/quincenas";
 import { formatCurrency } from "@/lib/format";
 
 const saleSchema = z.object({
@@ -54,7 +55,7 @@ const saleSchema = z.object({
       (v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 36,
       "Entre 1 y 36 cuotas"
     ),
-  firstCharge: z.enum(["ESTA", "PROXIMA"]),
+  firstChargeOffset: z.number().int().min(0),
   notes: z.string().optional(),
 });
 
@@ -63,15 +64,12 @@ type SaleValues = z.infer<typeof saleSchema>;
 export function NewSaleForm({
   clients,
   products,
-  estaQuincena,
-  proximaQuincena,
+  firstChargeOptions,
 }: {
   clients: { id: string; name: string }[];
   products: StockProduct[];
-  /** Etiqueta de la jornada de cobro vigente, ej. "15 de ago". */
-  estaQuincena: string;
-  /** Etiqueta de la siguiente, ej. "1 de sep". */
-  proximaQuincena: string;
+  /** Jornadas de cobro entre las que puede arrancar la venta. */
+  firstChargeOptions: FirstChargeOption[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
@@ -119,7 +117,7 @@ export function NewSaleForm({
       category: "ROPA",
       totalAmount: "",
       installmentsCount: "2",
-      firstCharge: "PROXIMA",
+      firstChargeOffset: 1,
       notes: "",
     },
   });
@@ -294,41 +292,32 @@ export function NewSaleForm({
 
         <FormField
           control={form.control}
-          name="firstCharge"
+          name="firstChargeOffset"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Primer cobro</FormLabel>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  {
-                    value: "PROXIMA" as const,
-                    title: proximaQuincena,
-                    hint: "La próxima quincena",
-                  },
-                  {
-                    value: "ESTA" as const,
-                    title: estaQuincena,
-                    hint: "Esta misma quincena",
-                  },
-                ].map((option) => {
-                  const active = field.value === option.value;
+              <div className="grid grid-cols-3 gap-2">
+                {firstChargeOptions.map((option) => {
+                  const active = field.value === option.offset;
                   return (
                     <button
-                      key={option.value}
+                      key={option.offset}
                       type="button"
-                      onClick={() => field.onChange(option.value)}
+                      onClick={() => field.onChange(option.offset)}
                       aria-pressed={active}
                       className={
                         active
-                          ? "rounded-lg border-2 border-indigo-500 bg-indigo-50 p-3 text-left dark:bg-indigo-950/40"
-                          : "rounded-lg border border-slate-200 p-3 text-left hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                          ? "rounded-lg border-2 border-indigo-500 bg-indigo-50 px-2 py-2.5 text-center dark:bg-indigo-950/40"
+                          : "rounded-lg border border-slate-200 px-2 py-2.5 text-center hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
                       }
                     >
-                      <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {option.title}
+                      <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {option.label}
                       </span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400">
-                        {option.hint}
+                      <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
+                        {option.daysAway === 0
+                          ? "cobras ya"
+                          : `en ${option.daysAway} día${option.daysAway === 1 ? "" : "s"}`}
                       </span>
                     </button>
                   );
