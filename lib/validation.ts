@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 // `unknown` como default: en una intersección se absorbe, así que
 // ActionResult      => { success: true }
@@ -39,3 +39,26 @@ export function dbErrorMessage(message: string): string {
   }
   return message;
 }
+
+/**
+ * UUID opcional que tolera la cadena vacía.
+ *
+ * Un `<select>` sin selección manda "", y `z.string().uuid()` lo rechaza con
+ * "Invalid uuid" antes de que la acción pueda convertirlo en null. Ese fue el
+ * error al anotar un pedido sin cliente registrado.
+ */
+export const optionalUuid = z
+  .union([z.literal(""), z.string().uuid("Selección de cliente inválida")])
+  .optional()
+  .nullable()
+  .transform((value) => (value ? value : null));
+
+/** Datos mínimos para dar de alta un cliente desde otro formulario. */
+export const newClientSchema = z.object({
+  name: z.string().trim().min(2, "Escribe el nombre del cliente").max(120),
+  phone: z
+    .string()
+    .trim()
+    .min(7, "El teléfono del cliente es obligatorio")
+    .max(30),
+});

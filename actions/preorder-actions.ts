@@ -4,7 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { zodMessage } from "@/lib/validation";
+import { ensureClient } from "@/lib/clients-server";
+import {
+  newClientSchema,
+  optionalUuid,
+  zodMessage,
+} from "@/lib/validation";
 import type { PreorderStatus } from "@/types/database.types";
 
 const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
@@ -16,8 +21,10 @@ const createPreorderSchema = z.object({
     .min(2, "Describe el producto")
     .max(300, "Descripción muy larga"),
   category: z.enum(CATEGORIES).default("PERFUME"),
-  clientId: z.string().uuid().optional().nullable(),
+  clientId: optionalUuid,
   clientNameRaw: z.string().max(120).optional().nullable(),
+  // Alta de cliente desde este mismo formulario.
+  newClient: newClientSchema.optional().nullable(),
   quantity: z.coerce.number().int().min(1).max(1000).default(1),
   estimatedPrice: z.coerce
     .number()
@@ -48,13 +55,22 @@ export async function createPreorder(input: CreatePreorderInput) {
     return { success: false, error: "No autorizado" };
   }
 
+  let clientId = parsed.clientId;
+  if (!clientId && parsed.newClient) {
+    const created = await ensureClient(supabase, user.id, parsed.newClient);
+    if ("error" in created) {
+      return { success: false, error: created.error };
+    }
+    clientId = created.id;
+  }
+
   const { data, error } = await supabase
     .from("preorders")
     .insert({
       user_id: user.id,
       product_name: parsed.productName.trim(),
       category: parsed.category,
-      client_id: parsed.clientId || null,
+      client_id: clientId,
       client_name_raw: parsed.clientNameRaw?.trim() || null,
       quantity: parsed.quantity,
       estimated_price: parsed.estimatedPrice ?? null,
@@ -70,8 +86,10 @@ export async function createPreorder(input: CreatePreorderInput) {
 
   revalidatePath("/");
   revalidatePath("/pedidos");
-  if (parsed.clientId) {
-    revalidatePath(`/clientes/${parsed.clientId}`);
+  revalidatePath("/clientes");
+  revalidatePath("/ventas/nueva");
+  if (clientId) {
+    revalidatePath(`/clientes/${clientId}`);
   }
 
   return { success: true, id: data.id };
@@ -108,8 +126,9 @@ const updatePreorderSchema = z.object({
   id: z.string().uuid(),
   productName: z.string().min(2).max(300),
   category: z.enum(CATEGORIES),
-  clientId: z.string().uuid().optional().nullable(),
+  clientId: optionalUuid,
   clientNameRaw: z.string().max(120).optional().nullable(),
+  newClient: newClientSchema.optional().nullable(),
   quantity: z.coerce.number().int().min(1).max(1000),
   estimatedPrice: z.coerce.number().min(0).max(99999999).optional().nullable(),
   status: z.enum(STATUSES),
@@ -133,12 +152,21 @@ export async function updatePreorder(input: z.infer<typeof updatePreorderSchema>
     return { success: false, error: "No autorizado" };
   }
 
+  let clientId = parsed.clientId;
+  if (!clientId && parsed.newClient) {
+    const created = await ensureClient(supabase, user.id, parsed.newClient);
+    if ("error" in created) {
+      return { success: false, error: created.error };
+    }
+    clientId = created.id;
+  }
+
   const { error } = await supabase
     .from("preorders")
     .update({
       product_name: parsed.productName.trim(),
       category: parsed.category,
-      client_id: parsed.clientId || null,
+      client_id: clientId,
       client_name_raw: parsed.clientNameRaw?.trim() || null,
       quantity: parsed.quantity,
       estimated_price: parsed.estimatedPrice ?? null,
@@ -154,8 +182,9 @@ export async function updatePreorder(input: z.infer<typeof updatePreorderSchema>
 
   revalidatePath("/");
   revalidatePath("/pedidos");
-  if (parsed.clientId) {
-    revalidatePath(`/clientes/${parsed.clientId}`);
+  revalidatePath("/clientes");
+  if (clientId) {
+    revalidatePath(`/clientes/${clientId}`);
   }
 
   return { success: true };

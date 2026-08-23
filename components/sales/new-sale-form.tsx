@@ -9,7 +9,11 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { createSale } from "@/actions/sale-actions";
-import { ClientFormDialog } from "@/components/clients/client-form-dialog";
+import {
+  ClientPicker,
+  clientSelectionError,
+  type ClientSelection,
+} from "@/components/clients/client-picker";
 import {
   SaleItemsField,
   type SaleItemDraft,
@@ -37,7 +41,6 @@ import { CATEGORY_OPTIONS } from "@/lib/labels";
 import { formatCurrency } from "@/lib/format";
 
 const saleSchema = z.object({
-  clientId: z.string().min(1, "Selecciona un cliente"),
   itemDescription: z.string().min(3, "Describe la mercancía"),
   category: z.enum(["ROPA", "CALZADO", "PERFUME", "OTRO"]),
   totalAmount: z
@@ -71,8 +74,9 @@ export function NewSaleForm({
   proximaQuincena: string;
 }) {
   const router = useRouter();
-  const [clientOptions, setClientOptions] = React.useState(clients);
   const [loading, setLoading] = React.useState(false);
+  const [client, setClient] = React.useState<ClientSelection>({ kind: "none" });
+  const [showClientError, setShowClientError] = React.useState(false);
   const [items, setItems] = React.useState<SaleItemDraft[]>([]);
   // Mientras no escriba nada a mano, la descripción y la categoría se
   // arman solas con lo que elija del inventario.
@@ -111,7 +115,6 @@ export function NewSaleForm({
   const form = useForm<SaleValues>({
     resolver: zodResolver(saleSchema),
     defaultValues: {
-      clientId: "",
       itemDescription: "",
       category: "ROPA",
       totalAmount: "",
@@ -131,9 +134,20 @@ export function NewSaleForm({
   }, [totalAmount, installmentsCount]);
 
   async function onSubmit(values: SaleValues) {
+    // El cliente es obligatorio en una venta: sin él no hay a quién cobrar.
+    if (clientSelectionError(client, { required: true })) {
+      setShowClientError(true);
+      return;
+    }
+
     setLoading(true);
     const res = await createSale({
       ...values,
+      clientId: client.kind === "existing" ? client.id : null,
+      newClient:
+        client.kind === "new"
+          ? { name: client.name, phone: client.phone }
+          : null,
       totalAmount: Number(values.totalAmount),
       installmentsCount: Number(values.installmentsCount),
       items,
@@ -153,40 +167,16 @@ export function NewSaleForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-2">
-          <FormField
-            control={form.control}
-            name="clientId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cliente</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Selecciona un cliente" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {clientOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <ClientFormDialog
-            compact
-            triggerClassName="h-11 w-full"
-            onCreated={(c) => {
-              setClientOptions((prev) => [...prev, { id: c.id, name: c.name }]);
-              form.setValue("clientId", c.id);
-            }}
-          />
-        </div>
+        <ClientPicker
+          clients={clients}
+          value={client}
+          onChange={(v) => {
+            setClient(v);
+            setShowClientError(false);
+          }}
+          required
+          showError={showClientError}
+        />
 
         <SaleItemsField
           products={products}

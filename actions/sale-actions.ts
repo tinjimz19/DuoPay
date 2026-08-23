@@ -10,8 +10,11 @@ import {
   currentQuincena,
   nextQuincena,
 } from "@/lib/quincenas";
+import { ensureClient } from "@/lib/clients-server";
 import {
   dbErrorMessage,
+  newClientSchema,
+  optionalUuid,
   zodMessage,
   type ActionResult,
 } from "@/lib/validation";
@@ -36,7 +39,9 @@ function revalidateSaleViews(clientId?: string | null) {
 }
 
 const createSaleSchema = z.object({
-  clientId: z.string().uuid("Selecciona un cliente"),
+  clientId: optionalUuid,
+  // Alta de cliente desde el mismo formulario de venta.
+  newClient: newClientSchema.optional().nullable(),
   itemDescription: z
     .string()
     .min(3, "Describe la mercancía")
@@ -93,6 +98,19 @@ export async function createSale(
     return { success: false, error: "No autorizado" };
   }
 
+  let clientId = values.clientId;
+  if (!clientId && values.newClient) {
+    const created = await ensureClient(supabase, user.id, values.newClient);
+    if ("error" in created) {
+      return { success: false, error: created.error };
+    }
+    clientId = created.id;
+  }
+
+  if (!clientId) {
+    return { success: false, error: "Selecciona un cliente" };
+  }
+
   // Una misma línea repetida sumaría dos veces contra el mismo stock.
   const wanted = new Map<string, number>();
   for (const item of values.items) {
@@ -131,7 +149,7 @@ export async function createSale(
     .from("sales")
     .insert({
       user_id: user.id,
-      client_id: values.clientId,
+      client_id: clientId,
       item_description: values.itemDescription.trim(),
       category: values.category,
       total_amount: round2(values.totalAmount),
@@ -165,7 +183,7 @@ export async function createSale(
     // La venta ya quedó registrada; si el stock falla se avisa pero no se
     // pierde la venta, que es lo que de verdad importa.
     if (stockError) {
-      revalidateSaleViews(values.clientId);
+      revalidateSaleViews(clientId);
       revalidatePath("/inventario");
       return {
         success: false,
@@ -176,7 +194,8 @@ export async function createSale(
 
   revalidatePath("/inventario");
 
-  revalidateSaleViews(values.clientId);
+  revalidateSaleViews(clientId);
+  revalidatePath("/clientes");
   revalidatePath("/cobranza");
   revalidatePath("/ventas/nueva");
 

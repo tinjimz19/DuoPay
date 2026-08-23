@@ -8,6 +8,11 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { createPreorder, updatePreorder } from "@/actions/preorder-actions";
+import {
+  ClientPicker,
+  clientSelectionError,
+  type ClientSelection,
+} from "@/components/clients/client-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,8 +57,6 @@ export interface PreorderFormData {
 const preorderSchema = z.object({
   productName: z.string().min(2, "Describe el producto solicitado"),
   category: z.enum(["ROPA", "CALZADO", "PERFUME", "OTRO"]),
-  clientId: z.string().optional(),
-  clientNameRaw: z.string().max(120).optional(),
   quantity: z
     .string()
     .min(1, "Indica la cantidad")
@@ -85,6 +88,12 @@ export function PreorderFormDialog({
 }) {
   const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
   const [loading, setLoading] = React.useState(false);
+  const [client, setClient] = React.useState<ClientSelection>(
+    preorder?.client_id
+      ? { kind: "existing", id: preorder.client_id }
+      : { kind: "none" }
+  );
+  const [showClientError, setShowClientError] = React.useState(false);
   const isEdit = Boolean(preorder);
   const isControlled = open !== undefined;
 
@@ -95,8 +104,6 @@ export function PreorderFormDialog({
     defaultValues: {
       productName: preorder?.product_name ?? "",
       category: preorder?.category ?? "PERFUME",
-      clientId: preorder?.client_id ?? "",
-      clientNameRaw: preorder?.client_name_raw ?? "",
       quantity: String(preorder?.quantity ?? 1),
       estimatedPrice:
         preorder?.estimated_price !== null && preorder?.estimated_price !== undefined
@@ -107,9 +114,30 @@ export function PreorderFormDialog({
     },
   });
 
-  const clientId = form.watch("clientId");
+  const vacio = React.useMemo(
+    () => ({
+      productName: "",
+      category: "PERFUME" as const,
+      quantity: "1",
+      estimatedPrice: "",
+      status: "PENDENT" as const,
+      notes: "",
+    }),
+    []
+  );
+
+  function limpiar() {
+    form.reset(vacio);
+    setClient({ kind: "none" });
+    setShowClientError(false);
+  }
 
   function handleOpenChange(next: boolean) {
+    // Al cerrar un alta, el formulario queda limpio para la próxima vez: el
+    // diálogo no se desmonta, así que si no se resetea reaparecen los datos.
+    if (!next && !isEdit) {
+      limpiar();
+    }
     if (!isControlled) {
       setInternalOpen(next);
     }
@@ -117,9 +145,23 @@ export function PreorderFormDialog({
   }
 
   async function onSubmit(values: PreorderValues) {
+    if (clientSelectionError(client, { required: false })) {
+      setShowClientError(true);
+      return;
+    }
+
     setLoading(true);
     const payload = {
       ...values,
+      clientId: client.kind === "existing" ? client.id : null,
+      // Los pedidos viejos guardaban un nombre suelto. Si este es uno de
+      // esos y no se eligió cliente, se conserva en vez de borrarse.
+      clientNameRaw:
+        client.kind === "none" ? (preorder?.client_name_raw ?? null) : null,
+      newClient:
+        client.kind === "new"
+          ? { name: client.name, phone: client.phone }
+          : null,
       quantity: Number(values.quantity),
       estimatedPrice:
         values.estimatedPrice === "" || values.estimatedPrice === undefined
@@ -138,6 +180,9 @@ export function PreorderFormDialog({
     }
 
     toast.success(isEdit ? "Pedido actualizado" : "Pedido anotado");
+    if (!isEdit) {
+      limpiar();
+    }
     handleOpenChange(false);
   }
 
@@ -209,60 +254,15 @@ export function PreorderFormDialog({
               )}
             />
 
-            <div className="space-y-2">
-              <FormField
-                control={form.control}
-                name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Cliente <span className="text-slate-400">(opcional)</span>
-                    </FormLabel>
-                    <Select
-                      onValueChange={(v) =>
-                        field.onChange(v === "none" ? "" : v)
-                      }
-                      value={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Cliente no registrado" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          Cliente no registrado
-                        </SelectItem>
-                        {clients.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {!clientId && (
-                <FormField
-                  control={form.control}
-                  name="clientNameRaw"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          placeholder="Nombre del cliente (texto libre)"
-                          className="h-11"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
+            <ClientPicker
+              clients={clients}
+              value={client}
+              onChange={(v) => {
+                setClient(v);
+                setShowClientError(false);
+              }}
+              showError={showClientError}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <FormField

@@ -77,6 +77,15 @@ export function ClientFormDialog({
     },
   });
 
+  function handleOpenChange(next: boolean) {
+    // El diálogo no se desmonta: sin reset, al reabrirlo salen los datos del
+    // cliente anterior.
+    if (!next && !isEdit) {
+      form.reset({ name: "", phone: "", notes: "" });
+    }
+    setOpen(next);
+  }
+
   async function onSubmit(values: ClientValues) {
     setLoading(true);
     const res = isEdit
@@ -92,14 +101,17 @@ export function ClientFormDialog({
 
     toast.success(isEdit ? "Cliente actualizado" : "Cliente creado");
     const newClientId = "id" in res ? (res as { id: string }).id : undefined;
-    if (!isEdit && onCreated && newClientId) {
-      onCreated({ id: newClientId, name: values.name });
+    if (!isEdit) {
+      if (onCreated && newClientId) {
+        onCreated({ id: newClientId, name: values.name });
+      }
+      form.reset({ name: "", phone: "", notes: "" });
     }
     setOpen(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {compact ? (
           <Button type="button" variant="outline" className={triggerClassName}>
