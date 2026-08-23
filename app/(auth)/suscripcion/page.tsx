@@ -1,9 +1,11 @@
 import { CreditCard, LogOut, MessageCircle } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { signOut } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { ReportPaymentDialog } from "@/components/subscription/report-payment-dialog";
-import { createClient } from "@/lib/supabase/server";
+import { currentAccount } from "@/lib/auth-server";
+import { getEffectiveStatus } from "@/lib/subscription";
 import type { ProfileStatus } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
@@ -32,21 +34,27 @@ const REASONS: Record<ProfileStatus, { title: string; message: string }> = {
 };
 
 export default async function SuscripcionPage() {
-  const supabase = createClient();
+  const account = await currentAccount();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let status: ProfileStatus = "EXPIRED";
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("status")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profile?.status) status = profile.status;
+  if (!account) {
+    redirect("/login");
   }
+
+  if (account.profile?.role === "super_admin") {
+    redirect("/admin");
+  }
+
+  // La puerta inversa de la del dashboard: si ya tiene acceso, no pinta nada
+  // que esté aquí. Antes lo decidía el middleware.
+  const effective = account.profile
+    ? getEffectiveStatus(account.profile)
+    : "EXPIRED";
+
+  if (!account.profile || effective === "TRIAL" || effective === "ACTIVE") {
+    redirect("/");
+  }
+
+  const status: ProfileStatus = effective;
 
   const reason = REASONS[status];
   const whatsappNumber = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? "";

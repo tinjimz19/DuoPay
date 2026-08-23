@@ -5,9 +5,9 @@ import { Header } from "@/components/navigation/header";
 import { Sidebar } from "@/components/navigation/sidebar";
 import { SetupNotice } from "@/components/setup-notice";
 import type { SubscriptionTone } from "@/components/subscription/subscription-badge";
+import { currentAccount } from "@/lib/auth-server";
 import { formatDateShort } from "@/lib/format";
 import { daysLeft, getEffectiveStatus } from "@/lib/subscription";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
   children,
@@ -21,21 +21,20 @@ export default async function DashboardLayout({
     return <SetupNotice />;
   }
 
-  const supabase = createClient();
+  // Una sola lectura de sesión + perfil por navegación, cacheada por React.
+  const account = await currentAccount();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!account) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, business_name, role, status, trial_ends_at, subscription_ends_at")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = account.profile;
+
+  // El super admin solo opera su panel. Esta puerta vivía en el middleware,
+  // donde costaba una consulta extra en cada request.
+  if (profile?.role === "super_admin") {
+    redirect("/admin");
+  }
 
   // Estado de la suscripción, que se muestra como insignia junto al nombre
   // del negocio. No aplica al super admin.
@@ -47,15 +46,24 @@ export default async function DashboardLayout({
         ? profile?.subscription_ends_at
         : null;
   const remaining = daysLeft(cutoffDate ?? null);
+  // El super admin ya se fue a /admin arriba, así que aquí solo hay tiendas.
   const showCutoff =
-    !!profile &&
-    profile.role !== "super_admin" &&
-    (effective === "TRIAL" || effective === "ACTIVE") &&
-    !!cutoffDate;
+    !!profile && (effective === "TRIAL" || effective === "ACTIVE") && !!cutoffDate;
 
   let tone: SubscriptionTone = "ok";
   if (remaining !== null && remaining <= 3) tone = "urgente";
   else if (remaining !== null && remaining <= 7) tone = "pronto";
+
+  // Sin acceso, a la pantalla de suscripción. Sin perfil se deja pasar para
+  // no bloquear una cuenta a medio migrar.
+  const tieneAcceso =
+    !profile ||
+    effective === "TRIAL" ||
+    effective === "ACTIVE";
+
+  if (!tieneAcceso) {
+    redirect("/suscripcion");
+  }
 
   const subscription = showCutoff
     ? {
@@ -69,7 +77,7 @@ export default async function DashboardLayout({
       <Sidebar />
       <div className="flex flex-1 flex-col md:pl-64">
         <Header
-          email={user.email ?? ""}
+          email={account.email}
           fullName={profile?.full_name ?? null}
           businessName={profile?.business_name ?? null}
           subscription={subscription}

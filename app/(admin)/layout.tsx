@@ -6,6 +6,7 @@ import { signOut } from "@/actions/auth-actions";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { currentAccount } from "@/lib/auth-server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
@@ -13,32 +14,17 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
+  const account = await currentAccount();
+
+  if (!account) {
     redirect("/login");
+  }
+
+  if (account.profile?.role !== "super_admin") {
+    redirect("/");
   }
 
   const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profile?.role !== "super_admin") {
-    redirect("/");
-  }
 
   const { count: pendingReports } = await supabase
     .from("payment_reports")
