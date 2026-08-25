@@ -40,8 +40,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Progress } from "@/components/ui/progress";
 import { formatBs, formatCurrency, formatTimeShort } from "@/lib/format";
+import { moneyInputValue, parseMoney } from "@/lib/money";
 import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
@@ -84,10 +86,6 @@ export interface SaleCardData {
   cobranza?: { state: CobranzaState; label: string; dueNow: number } | null;
 }
 
-function parseAmount(raw: string): number {
-  return parseFloat(raw.replace(",", "."));
-}
-
 /**
  * Una fila del historial de abonos, editable en sitio.
  * Corregir un monto mal tecleado no debería obligar a borrar la venta.
@@ -102,11 +100,11 @@ function PaymentRow({
   onChanged: () => void;
 }) {
   const [editing, setEditing] = React.useState(false);
-  const [draft, setDraft] = React.useState(String(payment.amount));
+  const [draft, setDraft] = React.useState(moneyInputValue(payment.amount));
   const [confirming, setConfirming] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
 
-  const parsed = parseAmount(draft);
+  const parsed = parseMoney(draft);
   const busy = pending || disabled;
 
   function save() {
@@ -146,15 +144,11 @@ function PaymentRow({
   if (editing) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/50 p-2 dark:border-indigo-900 dark:bg-indigo-950/30">
-        <Input
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="0.01"
+        <MoneyInput
           autoFocus
           className="h-9 flex-1"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={setDraft}
           aria-label="Nuevo monto del abono"
         />
         <Button
@@ -178,7 +172,7 @@ function PaymentRow({
           className="h-9 w-9 shrink-0"
           disabled={busy}
           onClick={() => {
-            setDraft(String(payment.amount));
+            setDraft(moneyInputValue(payment.amount));
             setEditing(false);
           }}
           aria-label="Cancelar"
@@ -337,7 +331,7 @@ export function SaleCard({
     });
   }
 
-  const parsedCustom = parseAmount(customAmount);
+  const parsedCustom = parseMoney(customAmount);
 
   const suggestedBs = euroRate ? (quincenaDue ?? suggested) * euroRate : null;
   const customBs =
@@ -467,16 +461,11 @@ export function SaleCard({
                   Monto personalizado
                 </Label>
                 <div className="flex gap-2">
-                  <Input
+                  <MoneyInput
                     id={`custom-amount-${sale.id}`}
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
                     className="h-11"
                     value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
+                    onChange={setCustomAmount}
                   />
                   <Button
                     type="button"

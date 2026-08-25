@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MoneyInput } from "@/components/ui/money-input";
 import { formatCurrency } from "@/lib/format";
+import { moneyInputValue, parseMoney } from "@/lib/money";
 
 export interface CobrarRow {
   saleId: string;
@@ -25,10 +27,6 @@ export interface CobrarRow {
   suggested: number;
   /** Tope: nunca se puede abonar más que el saldo de la venta. */
   remaining: number;
-}
-
-function parseAmount(raw: string): number {
-  return parseFloat(raw.replace(",", "."));
 }
 
 function round2(value: number): number {
@@ -64,14 +62,14 @@ export function CobrarDialog({
   React.useEffect(() => {
     if (!open) return;
     const next: Record<string, string> = {};
-    for (const row of rows) next[row.saleId] = row.suggested.toFixed(2);
+    for (const row of rows) next[row.saleId] = moneyInputValue(row.suggested);
     setAmounts(next);
     setNotes("");
   }, [open, rows]);
 
   const parsed = rows.map((row) => {
     const raw = amounts[row.saleId] ?? "";
-    const value = parseAmount(raw);
+    const value = parseMoney(raw);
     const valid = Number.isFinite(value) && value > 0;
     return {
       row,
@@ -145,20 +143,12 @@ export function CobrarDialog({
                 </span>
               </div>
               <div className="flex gap-2">
-                <Input
+                <MoneyInput
                   id={`monto-${row.saleId}`}
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  max={row.remaining}
                   className="h-11"
                   value={raw}
-                  onChange={(e) =>
-                    setAmounts((prev) => ({
-                      ...prev,
-                      [row.saleId]: e.target.value,
-                    }))
+                  onChange={(next) =>
+                    setAmounts((prev) => ({ ...prev, [row.saleId]: next }))
                   }
                 />
                 <Button
@@ -169,7 +159,7 @@ export function CobrarDialog({
                   onClick={() =>
                     setAmounts((prev) => ({
                       ...prev,
-                      [row.saleId]: row.remaining.toFixed(2),
+                      [row.saleId]: moneyInputValue(row.remaining),
                     }))
                   }
                 >

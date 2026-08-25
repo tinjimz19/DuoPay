@@ -29,6 +29,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CATEGORY_OPTIONS } from "@/lib/labels";
+import { parseMoney } from "@/lib/money";
 import type { FirstChargeOption } from "@/lib/quincenas";
 import { formatCurrency } from "@/lib/format";
 
@@ -47,7 +49,7 @@ const saleSchema = z.object({
   totalAmount: z
     .string()
     .min(1, "Indica el monto total")
-    .refine((v) => Number(v) > 0, "El monto debe ser mayor a 0"),
+    .refine((v) => parseMoney(v) > 0, "El monto debe ser mayor a 0"),
   installmentsCount: z
     .string()
     .min(1, "Indica las cuotas")
@@ -125,7 +127,7 @@ export function NewSaleForm({
   const totalAmount = form.watch("totalAmount");
   const installmentsCount = form.watch("installmentsCount");
   const installmentAmount = React.useMemo(() => {
-    const total = Number(totalAmount);
+    const total = parseMoney(totalAmount);
     const count = Number(installmentsCount);
     if (!Number.isFinite(total) || total <= 0 || !count || count <= 0) return null;
     return total / count;
@@ -146,7 +148,7 @@ export function NewSaleForm({
         client.kind === "new"
           ? { name: client.name, phone: client.phone }
           : null,
-      totalAmount: Number(values.totalAmount),
+      totalAmount: parseMoney(values.totalAmount),
       installmentsCount: Number(values.installmentsCount),
       items,
     });
@@ -243,14 +245,13 @@ export function NewSaleForm({
               <FormItem>
                 <FormLabel>Monto total ($)</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
+                  <MoneyInput
                     className="h-11"
-                    {...field}
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={field.value}
+                    onChange={field.onChange}
                   />
                 </FormControl>
                 <FormMessage />

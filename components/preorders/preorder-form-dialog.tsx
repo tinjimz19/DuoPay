@@ -31,6 +31,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
+import { moneyInputValue, parseMoney } from "@/lib/money";
 import {
   Select,
   SelectContent,
@@ -105,10 +107,7 @@ export function PreorderFormDialog({
       productName: preorder?.product_name ?? "",
       category: preorder?.category ?? "PERFUME",
       quantity: String(preorder?.quantity ?? 1),
-      estimatedPrice:
-        preorder?.estimated_price !== null && preorder?.estimated_price !== undefined
-          ? String(preorder.estimated_price)
-          : "",
+      estimatedPrice: moneyInputValue(preorder?.estimated_price),
       status: preorder?.status ?? "PENDENT",
       notes: preorder?.notes ?? "",
     },
@@ -166,7 +165,7 @@ export function PreorderFormDialog({
       estimatedPrice:
         values.estimatedPrice === "" || values.estimatedPrice === undefined
           ? null
-          : Number(values.estimatedPrice),
+          : parseMoney(values.estimatedPrice),
     };
     const res = isEdit
       ? await updatePreorder({ id: preorder!.id, ...payload })
@@ -294,14 +293,13 @@ export function PreorderFormDialog({
                       <span className="text-slate-400">(opcional)</span>
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
+                      <MoneyInput
                         className="h-11"
-                        {...field}
+                        name={field.name}
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />

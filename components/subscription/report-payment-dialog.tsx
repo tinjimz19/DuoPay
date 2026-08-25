@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MoneyInput } from "@/components/ui/money-input";
+import { parseMoney } from "@/lib/money";
 import {
   Select,
   SelectContent,
@@ -77,7 +79,7 @@ export function ReportPaymentDialog({
       toast.error("Selecciona el método de pago");
       return;
     }
-    const parsedAmount = amount ? parseFloat(amount.replace(",", ".")) : null;
+    const parsedAmount = amount ? parseMoney(amount) : null;
     if (amount && (!parsedAmount || parsedAmount <= 0)) {
       toast.error("Monto inválido");
       return;
@@ -165,16 +167,12 @@ export function ReportPaymentDialog({
               <Label htmlFor="report-amount">
                 Monto <span className="text-slate-400">(USD)</span>
               </Label>
-              <Input
+              <MoneyInput
                 id="report-amount"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="10.00"
+                placeholder="10,00"
                 className="h-11"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={setAmount}
               />
             </div>
             <div className="space-y-2">
