@@ -3,6 +3,7 @@
 import { ShoppingBag } from "lucide-react";
 import * as React from "react";
 
+import { Paginacion, usePagination } from "@/components/pagination";
 import { SaleCard, type SaleCardData } from "@/components/sales/sale-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,8 +38,11 @@ export function SaleList({
     });
   }, [sales, filter, query]);
 
+  // Se pagina lo ya filtrado: la pestaña y el buscador siguen viendo todo.
+  const pagina = usePagination(filtered, { resetKey: `${filter}|${query}` });
+
   return (
-    <div className="space-y-4">
+    <div className="scroll-mt-24 space-y-4" ref={pagina.topRef}>
       <div className="space-y-3">
         <Tabs
           value={filter}
@@ -71,11 +75,13 @@ export function SaleList({
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map((sale) => (
+          {pagina.items.map((sale) => (
             <SaleCard key={sale.id} sale={sale} businessName={businessName} />
           ))}
         </div>
       )}
+
+      <Paginacion pagination={pagina} noun="ventas" />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import * as React from "react";
 
+import { Paginacion, usePagination } from "@/components/pagination";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,8 +47,11 @@ export function ClientList({
     );
   }, [clients, query]);
 
+  // Se pagina lo ya filtrado: el buscador sigue mirando la lista completa.
+  const pagina = usePagination(filtered, { resetKey: query });
+
   return (
-    <div className="space-y-3">
+    <div className="scroll-mt-24 space-y-3" ref={pagina.topRef}>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
@@ -69,7 +73,7 @@ export function ClientList({
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map((client) => (
+          {pagina.items.map((client) => (
             <Card
               key={client.id}
               className="border-slate-200 bg-white shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/50"
@@ -142,6 +146,8 @@ export function ClientList({
           ))}
         </div>
       )}
+
+      <Paginacion pagination={pagina} noun="clientes" />
     </div>
   );
 }

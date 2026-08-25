@@ -3,6 +3,7 @@
 import { PackageSearch } from "lucide-react";
 import * as React from "react";
 
+import { Paginacion, usePagination } from "@/components/pagination";
 import { PreorderCard, type PreorderCardData } from "@/components/preorders/preorder-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,8 +43,11 @@ export function PreorderList({
     });
   }, [preorders, category, status]);
 
+  // Se pagina lo ya filtrado: las pestañas siguen viendo todos los pedidos.
+  const pagina = usePagination(filtered, { resetKey: `${category}|${status}` });
+
   return (
-    <div className="space-y-4">
+    <div className="scroll-mt-24 space-y-4" ref={pagina.topRef}>
       <div className="space-y-3">
         <Tabs value={category} onValueChange={setCategory}>
           <TabsList className="w-full">
@@ -74,7 +78,7 @@ export function PreorderList({
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map((preorder) => (
+          {pagina.items.map((preorder) => (
             <PreorderCard
               key={preorder.id}
               preorder={preorder}
@@ -83,6 +87,8 @@ export function PreorderList({
           ))}
         </div>
       )}
+
+      <Paginacion pagination={pagina} noun="pedidos" />
     </div>
   );
 }
