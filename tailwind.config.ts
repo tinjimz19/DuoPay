@@ -7,6 +7,11 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    // `lib/` también tiene clases: los colores de las categorías, los
+    // estados de cobranza y los de suscripción viven ahí. Sin esta línea
+    // Tailwind no las ve y salen sin color en producción — funcionaban
+    // solo cuando por casualidad la misma clase se usaba en un componente.
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

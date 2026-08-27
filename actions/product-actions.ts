@@ -10,7 +10,15 @@ import {
   type ActionResult,
 } from "@/lib/validation";
 
-const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
+/*
+ * La categoría ya no es una lista fija: la administra el super admin. Se
+ * valida el FORMATO aquí y la EXISTENCIA la impone la clave foránea de la
+ * base, que es la única que puede saber el catálogo del momento.
+ */
+const categorySchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z0-9_]{2,32}$/, "Categoría inválida");
 
 /**
  * El inventario es a propósito mínimo: nombre, categoría y cantidad.
@@ -34,7 +42,7 @@ const nameSchema = z
 
 const createProductSchema = z.object({
   name: nameSchema,
-  category: z.enum(CATEGORIES).default("OTRO"),
+  category: categorySchema.default("OTRO"),
   initialStock: z.coerce
     .number({ message: "Cantidad inválida" })
     .int("La cantidad debe ser un número entero")
@@ -108,7 +116,7 @@ export async function createProduct(
 const updateProductSchema = z.object({
   id: z.string().uuid(),
   name: nameSchema,
-  category: z.enum(CATEGORIES),
+  category: categorySchema,
 });
 
 export async function updateProduct(

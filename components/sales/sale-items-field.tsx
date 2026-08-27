@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CATEGORY_LABELS } from "@/lib/labels";
+import { useCategories } from "@/components/categories-provider";
 import { cn } from "@/lib/utils";
 import type { ProductCategory } from "@/types/database.types";
 
@@ -48,6 +48,7 @@ export function SaleItemsField({
   value: SaleItemDraft[];
   onChange: (items: SaleItemDraft[]) => void;
 }) {
+  const categorias = useCategories();
   const byId = React.useMemo(
     () => new Map(products.map((p) => [p.id, p])),
     [products]
@@ -101,7 +102,7 @@ export function SaleItemsField({
                     {product.name}
                   </p>
                   <p className="truncate text-xs text-slate-400 dark:text-slate-500">
-                    {CATEGORY_LABELS[product.category]} · quedan{" "}
+                    {categorias.label(product.category)} · quedan{" "}
                     {product.stock - item.quantity} de {product.stock}
                   </p>
                 </div>

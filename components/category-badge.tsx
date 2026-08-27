@@ -1,23 +1,27 @@
-import type { ProductCategory } from "@/types/database.types";
-import { CATEGORY_LABELS } from "@/lib/labels";
+"use client";
+
+import { useCategories } from "@/components/categories-provider";
 import { Badge } from "@/components/ui/badge";
+import { categoryBadgeClass } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 
-const CATEGORY_STYLES: Record<ProductCategory, string> = {
-  ROPA:
-    "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800",
-  CALZADO:
-    "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800",
-  PERFUME:
-    "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800",
-  OTRO:
-    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
-};
+/**
+ * La insignia de categoría.
+ *
+ * Antes tenía los cuatro colores escritos a mano; ahora el nombre y el
+ * color salen del catálogo. Una categoría apagada se sigue pintando: lo
+ * que ya se vendió tiene que poder verse igual.
+ */
+export function CategoryBadge({ category }: { category: string }) {
+  const { get } = useCategories();
+  const c = get(category);
 
-export function CategoryBadge({ category }: { category: ProductCategory }) {
   return (
-    <Badge variant="outline" className={cn("border", CATEGORY_STYLES[category])}>
-      {CATEGORY_LABELS[category]}
+    <Badge
+      variant="outline"
+      className={cn("border", categoryBadgeClass(c.color))}
+    >
+      {c.label}
     </Badge>
   );
 }

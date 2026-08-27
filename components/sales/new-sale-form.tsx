@@ -38,14 +38,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CATEGORY_OPTIONS } from "@/lib/labels";
+import { useCategories } from "@/components/categories-provider";
 import { parseMoney } from "@/lib/money";
 import type { FirstChargeOption } from "@/lib/quincenas";
 import { formatCurrency } from "@/lib/format";
 
 const saleSchema = z.object({
   itemDescription: z.string().min(3, "Describe la mercancía"),
-  category: z.enum(["ROPA", "CALZADO", "PERFUME", "OTRO"]),
+  category: z.string().min(2, "Elige una categoría"),
   totalAmount: z
     .string()
     .min(1, "Indica el monto total")
@@ -74,6 +74,7 @@ export function NewSaleForm({
   firstChargeOptions: FirstChargeOption[];
 }) {
   const router = useRouter();
+  const categorias = useCategories();
   const [loading, setLoading] = React.useState(false);
   const [client, setClient] = React.useState<ClientSelection>({ kind: "none" });
   const [showClientError, setShowClientError] = React.useState(false);
@@ -116,7 +117,8 @@ export function NewSaleForm({
     resolver: zodResolver(saleSchema),
     defaultValues: {
       itemDescription: "",
-      category: "ROPA",
+      // La primera del catálogo, sea cual sea hoy.
+      category: categorias.selectable[0]?.slug ?? "OTRO",
       totalAmount: "",
       installmentsCount: "2",
       firstChargeOffset: 1,
@@ -225,8 +227,8 @@ export function NewSaleForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
+                    {categorias.selectable.map((c) => (
+                      <SelectItem key={c.slug} value={c.slug}>
                         {c.label}
                       </SelectItem>
                     ))}

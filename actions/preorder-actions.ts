@@ -12,7 +12,15 @@ import {
 } from "@/lib/validation";
 import type { PreorderStatus } from "@/types/database.types";
 
-const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
+/*
+ * La categoría ya no es una lista fija: la administra el super admin. Se
+ * valida el FORMATO aquí y la EXISTENCIA la impone la clave foránea de la
+ * base, que es la única que puede saber el catálogo del momento.
+ */
+const categorySchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z0-9_]{2,32}$/, "Categoría inválida");
 const STATUSES = ["PENDENT", "ORDERED", "DELIVERED", "CANCELLED"] as const;
 
 const createPreorderSchema = z.object({
@@ -20,7 +28,7 @@ const createPreorderSchema = z.object({
     .string()
     .min(2, "Describe el producto")
     .max(300, "Descripción muy larga"),
-  category: z.enum(CATEGORIES).default("PERFUME"),
+  category: categorySchema.default("PERFUME"),
   clientId: optionalUuid,
   clientNameRaw: z.string().max(120).optional().nullable(),
   // Alta de cliente desde este mismo formulario.
@@ -125,7 +133,7 @@ export async function updatePreorderStatus(id: string, status: PreorderStatus) {
 const updatePreorderSchema = z.object({
   id: z.string().uuid(),
   productName: z.string().min(2).max(300),
-  category: z.enum(CATEGORIES),
+  category: categorySchema,
   clientId: optionalUuid,
   clientNameRaw: z.string().max(120).optional().nullable(),
   newClient: newClientSchema.optional().nullable(),

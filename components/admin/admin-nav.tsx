@@ -9,6 +9,7 @@ const items = [
   { href: "/admin", label: "Resumen" },
   { href: "/admin/tiendas", label: "Tiendas" },
   { href: "/admin/pagos", label: "Pagos" },
+  { href: "/admin/categorias", label: "Categorías" },
 ];
 
 export function AdminNav({ pendingCount = 0 }: { pendingCount?: number }) {

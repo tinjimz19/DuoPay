@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CATEGORY_OPTIONS } from "@/lib/labels";
+import { useCategories } from "@/components/categories-provider";
 import type { ProductCategory } from "@/types/database.types";
 
 export function ProductFormDialog({
@@ -39,6 +39,7 @@ export function ProductFormDialog({
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [name, setName] = React.useState(product?.name ?? "");
+  const categorias = useCategories();
   const [category, setCategory] = React.useState<ProductCategory>(
     product?.category ?? "OTRO"
   );
@@ -126,8 +127,8 @@ export function ProductFormDialog({
                 <SelectValue placeholder="Categoría" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORY_OPTIONS.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
+                {categorias.selectable.map((c) => (
+                  <SelectItem key={c.slug} value={c.slug}>
                     {c.label}
                   </SelectItem>
                 ))}

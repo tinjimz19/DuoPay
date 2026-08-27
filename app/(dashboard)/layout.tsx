@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 
+import { CategoriesProvider } from "@/components/categories-provider";
 import { BottomNav } from "@/components/navigation/bottom-nav";
 import { Header } from "@/components/navigation/header";
 import { Sidebar } from "@/components/navigation/sidebar";
 import { SetupNotice } from "@/components/setup-notice";
 import type { SubscriptionTone } from "@/components/subscription/subscription-badge";
 import { currentAccount } from "@/lib/auth-server";
+import { allCategories } from "@/lib/categories-server";
 import { formatDateShort } from "@/lib/format";
 import { daysLeft, getEffectiveStatus } from "@/lib/subscription";
 
@@ -22,7 +24,11 @@ export default async function DashboardLayout({
   }
 
   // Una sola lectura de sesión + perfil por navegación, cacheada por React.
-  const account = await currentAccount();
+  // El catálogo de categorías viaja igual: se lee aquí y baja por contexto.
+  const [account, categories] = await Promise.all([
+    currentAccount(),
+    allCategories(),
+  ]);
 
   if (!account) {
     redirect("/login");
@@ -73,6 +79,7 @@ export default async function DashboardLayout({
     : null;
 
   return (
+    <CategoriesProvider categories={categories}>
     <div className="app-shell flex flex-col bg-slate-50 dark:bg-slate-950">
       <Sidebar />
       <div className="flex flex-1 flex-col md:pl-64">
@@ -89,5 +96,6 @@ export default async function DashboardLayout({
       </div>
       <BottomNav />
     </div>
+    </CategoriesProvider>
   );
 }

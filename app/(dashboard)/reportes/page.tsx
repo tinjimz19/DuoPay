@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CATEGORY_LABELS } from "@/lib/labels";
+import { allCategories } from "@/lib/categories-server";
+import { categoryLabelMap } from "@/lib/categories";
 import { caracasDateStr, formatCurrency, formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { ProductCategory } from "@/types/database.types";
@@ -121,6 +122,9 @@ export default async function ReportesPage({
     a[0].localeCompare(b[0])
   );
   const maxDay = Math.max(0, ...perDay.map(([, amount]) => amount));
+
+  // El nombre de cada categoría sale del catálogo, no de una lista fija.
+  const nombreCategoria = categoryLabelMap(await allCategories());
 
   const catMap = new Map<ProductCategory, number>();
   for (const p of payments) {
@@ -327,7 +331,7 @@ export default async function ReportesPage({
                     return (
                       <div key={category} className="flex items-center gap-3">
                         <span className="w-24 shrink-0 text-xs text-slate-500 dark:text-slate-400">
-                          {CATEGORY_LABELS[category]}
+                          {nombreCategoria.get(category) ?? category}
                         </span>
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                           <div

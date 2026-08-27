@@ -6,7 +6,12 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type ProductCategory = "ROPA" | "CALZADO" | "PERFUME" | "OTRO";
+/**
+ * Las categorías dejaron de ser un ENUM: ahora son filas de la tabla
+ * `categories`, que administra el super admin. El tipo queda como texto
+ * a propósito — la lista ya no se conoce al compilar.
+ */
+export type ProductCategory = string;
 export type SaleStatus = "PENDING" | "PARTIAL" | "COMPLETED";
 export type PreorderStatus = "PENDENT" | "ORDERED" | "DELIVERED" | "CANCELLED";
 export type ProfileRole = "owner" | "super_admin";
@@ -316,6 +321,33 @@ export interface Database {
           }
         ];
       };
+      categories: {
+        Row: {
+          slug: string;
+          label: string;
+          color: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          slug: string;
+          label: string;
+          color?: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          slug?: string;
+          label?: string;
+          color?: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       payment_methods: {
         Row: {
           id: string;
@@ -468,9 +500,17 @@ export interface Database {
           email: string | null;
         }[];
       };
+      category_usage: {
+        Args: Record<string, never>;
+        Returns: {
+          slug: string;
+          ventas: number;
+          pedidos: number;
+          productos: number;
+        }[];
+      };
     };
     Enums: {
-      product_category: ProductCategory;
       sale_status: SaleStatus;
       preorder_status: PreorderStatus;
       profile_role: ProfileRole;

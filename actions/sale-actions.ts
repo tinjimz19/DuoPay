@@ -15,7 +15,15 @@ import {
   type ActionResult,
 } from "@/lib/validation";
 
-const CATEGORIES = ["ROPA", "CALZADO", "PERFUME", "OTRO"] as const;
+/*
+ * La categoría ya no es una lista fija: la administra el super admin. Se
+ * valida el FORMATO aquí y la EXISTENCIA la impone la clave foránea de la
+ * base, que es la única que puede saber el catálogo del momento.
+ */
+const categorySchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z0-9_]{2,32}$/, "Categoría inválida");
 
 /** Los montos viven como NUMERIC(10,2): nada de centésimas fantasma. */
 function round2(value: number): number {
@@ -42,7 +50,7 @@ const createSaleSchema = z.object({
     .string()
     .min(3, "Describe la mercancía")
     .max(300, "Descripción muy larga"),
-  category: z.enum(CATEGORIES).default("ROPA"),
+  category: categorySchema.default("ROPA"),
   totalAmount: z.coerce
     .number({ message: "Monto inválido" })
     .positive("El monto debe ser mayor a 0"),

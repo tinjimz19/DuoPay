@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CATEGORY_LABELS, CATEGORY_OPTIONS } from "@/lib/labels";
+import { useCategories } from "@/components/categories-provider";
 import { cn } from "@/lib/utils";
 import type { ProductCategory } from "@/types/database.types";
 
@@ -303,6 +303,7 @@ function ProductRow({ product }: { product: InventoryProduct }) {
 }
 
 export function InventoryList({ products }: { products: InventoryProduct[] }) {
+  const categorias = useCategories();
   const [query, setQuery] = React.useState("");
 
   const filtrados = React.useMemo(() => {
@@ -313,12 +314,14 @@ export function InventoryList({ products }: { products: InventoryProduct[] }) {
 
   // Se agrupa con las mismas categorías que ya usan las ventas.
   const porCategoria = React.useMemo(() => {
-    return CATEGORY_OPTIONS.map((option) => ({
-      category: option.value,
-      label: CATEGORY_LABELS[option.value],
-      items: filtrados.filter((p) => p.category === option.value),
+    return categorias.all.map((option) => ({
+      category: option.slug,
+      label: option.label,
+      items: filtrados.filter((p) => p.category === option.slug),
     })).filter((group) => group.items.length > 0);
-  }, [filtrados]);
+    // El catálogo entra en las dependencias: si el super admin agrega una
+    // categoría, los grupos tienen que rearmarse.
+  }, [filtrados, categorias.all]);
 
   return (
     <div className="space-y-4">

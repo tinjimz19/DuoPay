@@ -41,7 +41,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CATEGORY_OPTIONS, PREORDER_STATUS_OPTIONS } from "@/lib/labels";
+import { useCategories } from "@/components/categories-provider";
+import { PREORDER_STATUS_OPTIONS } from "@/lib/labels";
 import type { PreorderStatus, ProductCategory } from "@/types/database.types";
 
 export interface PreorderFormData {
@@ -58,7 +59,7 @@ export interface PreorderFormData {
 
 const preorderSchema = z.object({
   productName: z.string().min(2, "Describe el producto solicitado"),
-  category: z.enum(["ROPA", "CALZADO", "PERFUME", "OTRO"]),
+  category: z.string().min(2, "Elige una categoría"),
   quantity: z
     .string()
     .min(1, "Indica la cantidad")
@@ -88,6 +89,7 @@ export function PreorderFormDialog({
   hideTrigger?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const categorias = useCategories();
   const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
   const [loading, setLoading] = React.useState(false);
   const [client, setClient] = React.useState<ClientSelection>(
@@ -105,7 +107,7 @@ export function PreorderFormDialog({
     resolver: zodResolver(preorderSchema),
     defaultValues: {
       productName: preorder?.product_name ?? "",
-      category: preorder?.category ?? "PERFUME",
+      category: preorder?.category ?? categorias.selectable[0]?.slug ?? "OTRO",
       quantity: String(preorder?.quantity ?? 1),
       estimatedPrice: moneyInputValue(preorder?.estimated_price),
       status: preorder?.status ?? "PENDENT",
@@ -116,13 +118,13 @@ export function PreorderFormDialog({
   const vacio = React.useMemo(
     () => ({
       productName: "",
-      category: "PERFUME" as const,
+      category: categorias.selectable[0]?.slug ?? "OTRO",
       quantity: "1",
       estimatedPrice: "",
       status: "PENDENT" as const,
       notes: "",
     }),
-    []
+    [categorias.selectable]
   );
 
   function limpiar() {
@@ -241,8 +243,8 @@ export function PreorderFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {CATEGORY_OPTIONS.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
+                      {categorias.selectable.map((c) => (
+                        <SelectItem key={c.slug} value={c.slug}>
                           {c.label}
                         </SelectItem>
                       ))}

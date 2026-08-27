@@ -1,24 +1,15 @@
 import type {
   PreorderStatus,
-  ProductCategory,
   ProfileRole,
   ProfileStatus,
   SaleStatus,
 } from "@/types/database.types";
 
-export const CATEGORY_LABELS: Record<ProductCategory, string> = {
-  ROPA: "Ropa",
-  CALZADO: "Calzado",
-  PERFUME: "Perfume",
-  OTRO: "Otro",
-};
-
-export const CATEGORY_OPTIONS: { value: ProductCategory; label: string }[] = [
-  { value: "ROPA", label: "Ropa" },
-  { value: "CALZADO", label: "Calzado" },
-  { value: "PERFUME", label: "Perfume" },
-  { value: "OTRO", label: "Otro" },
-];
+/*
+ * Las categorías ya no viven aquí: son datos que administra el super
+ * admin. En el servidor se leen con `allCategories()`; en pantalla, con
+ * el hook `useCategories()`.
+ */
 
 export const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
   PENDING: "Pendiente",
