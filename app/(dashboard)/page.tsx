@@ -307,12 +307,15 @@ export default async function DashboardPage() {
                   href={client ? `/clientes/${client.id}` : "/ventas"}
                   className="flex items-center justify-between gap-3 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
+                  {/* El cliente arriba y en grande, igual que en la lista
+                      de ventas: uno reconoce la venta por la persona, no
+                      por la mercancía. */}
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {sale.item_description}
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {client?.name ?? "Cliente"}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {client?.name ?? "Cliente"}
+                      {sale.item_description}
                     </p>
                   </div>
                   {/* El badge va primero y el monto de último, alineado a la
