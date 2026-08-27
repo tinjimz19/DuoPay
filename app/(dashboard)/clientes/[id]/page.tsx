@@ -239,6 +239,7 @@ export default async function ClienteDetailPage({
                     };
                   })(),
                 }}
+                showClient={false}
               />
             ))}
           </div>

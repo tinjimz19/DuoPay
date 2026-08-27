@@ -12,14 +12,21 @@ import { cn } from "@/lib/utils";
  * color salen del catálogo. Una categoría apagada se sigue pintando: lo
  * que ya se vendió tiene que poder verse igual.
  */
-export function CategoryBadge({ category }: { category: string }) {
+export function CategoryBadge({
+  category,
+  className,
+}: {
+  category: string;
+  /** Para la versión compacta que va en línea con el texto. */
+  className?: string;
+}) {
   const { get } = useCategories();
   const c = get(category);
 
   return (
     <Badge
       variant="outline"
-      className={cn("border", categoryBadgeClass(c.color))}
+      className={cn("border", categoryBadgeClass(c.color), className)}
     >
       {c.label}
     </Badge>

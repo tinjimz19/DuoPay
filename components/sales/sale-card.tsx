@@ -251,11 +251,14 @@ export function SaleCard({
   sale,
   businessName,
   paymentBlock,
+  showClient = true,
 }: {
   sale: SaleCardData;
   businessName?: string | null;
   /** Datos de cobro ya armados en el servidor, para el mensaje. */
   paymentBlock?: string[];
+  /** En la ficha de un cliente sobra repetir su nombre en cada venta. */
+  showClient?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -350,19 +353,31 @@ export function SaleCard({
             type="button"
             className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/50"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="mb-1">
-                  <CategoryBadge category={sale.category} />
+            {/* El nombre del cliente manda: en una lista larga, uno busca
+                por persona, no por mercancía. En la ficha del propio
+                cliente sobra repetirlo, y ahí titula la mercancía.
+                El pr-7 deja libre la esquina donde flota el menú "···";
+                sin él, la insignia de estado quedaba cortada. */}
+            <div className="flex items-start justify-between gap-3 pr-7">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-bold leading-tight text-slate-900 dark:text-slate-100">
+                  {showClient ? sale.client_name : sale.item_description}
+                </p>
+                <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                  {showClient && (
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {sale.item_description}
+                    </p>
+                  )}
+                  <CategoryBadge
+                    category={sale.category}
+                    className="shrink-0 px-1.5 py-0 text-[10px] font-semibold"
+                  />
                 </div>
-                <p className="truncate font-medium text-slate-900 dark:text-slate-100">
-                  {sale.item_description}
-                </p>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {sale.client_name}
-                </p>
               </div>
-              <SaleStatusBadge status={sale.status} />
+              <div className="shrink-0">
+                <SaleStatusBadge status={sale.status} />
+              </div>
             </div>
             <div className="mt-3">
               <div className="mb-1 flex items-center justify-between text-sm">
