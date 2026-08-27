@@ -6,7 +6,7 @@ import { signOut } from "@/actions/auth-actions";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import { currentAccount } from "@/lib/auth-server";
+import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
@@ -17,7 +17,7 @@ export default async function AdminLayout({
   const account = await currentAccount();
 
   if (!account) {
-    redirect("/login");
+    redirect(LOGIN_SESION_VENCIDA);
   }
 
   if (account.profile?.role !== "super_admin") {

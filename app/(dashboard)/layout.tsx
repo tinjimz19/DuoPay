@@ -6,7 +6,7 @@ import { Header } from "@/components/navigation/header";
 import { Sidebar } from "@/components/navigation/sidebar";
 import { SetupNotice } from "@/components/setup-notice";
 import type { SubscriptionTone } from "@/components/subscription/subscription-badge";
-import { currentAccount } from "@/lib/auth-server";
+import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
 import { allCategories } from "@/lib/categories-server";
 import { formatDateShort } from "@/lib/format";
 import { daysLeft, getEffectiveStatus } from "@/lib/subscription";
@@ -31,7 +31,7 @@ export default async function DashboardLayout({
   ]);
 
   if (!account) {
-    redirect("/login");
+    redirect(LOGIN_SESION_VENCIDA);
   }
 
   const profile = account.profile;

@@ -8,7 +8,7 @@ import { LogoUploader } from "@/components/settings/logo-uploader";
 import { PaymentMethodsManager } from "@/components/settings/payment-methods-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { currentAccount } from "@/lib/auth-server";
+import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
 import { storePaymentMethods } from "@/lib/settings-server";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export default async function ConfiguracionPage() {
   ]);
 
   if (!account) {
-    redirect("/login");
+    redirect(LOGIN_SESION_VENCIDA);
   }
 
   const profile = account.profile;

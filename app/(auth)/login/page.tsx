@@ -248,8 +248,13 @@ export default function LoginPage() {
 
 function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Lo pone un layout que no pudo confirmar la sesión. Sin esto, esta
+  // pantalla empujaría al inicio, el layout devolvería aquí, y a rebotar.
+  const sesionVencida = searchParams.get("sesion") === "vencida";
 
   React.useEffect(() => {
+    if (sesionVencida) return;
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
@@ -257,14 +262,16 @@ function LoginPageInner() {
         router.refresh();
       }
     });
-  }, [router]);
+  }, [router, sesionVencida]);
 
   return (
     <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <CardHeader>
         <CardTitle>Bienvenido de nuevo</CardTitle>
         <CardDescription>
-          Inicia sesión o crea tu cuenta para continuar.
+          {sesionVencida
+            ? "Tu sesión ya no es válida. Vuelve a entrar."
+            : "Inicia sesión o crea tu cuenta para continuar."}
         </CardDescription>
       </CardHeader>
       <CardContent>

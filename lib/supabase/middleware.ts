@@ -76,9 +76,16 @@ export async function updateSession(request: NextRequest) {
     return redirectWithSession(url, supabaseResponse);
   }
 
-  if (signedIn && isLoginRoute) {
+  // El marcador lo pone un layout que NO pudo confirmar la sesión. Si aun
+  // así lo devolviéramos al inicio, ese layout lo volvería a mandar aquí y
+  // el navegador rebotaría para siempre. Con marcador, se queda en el login.
+  const vieneDeSesionVencida =
+    request.nextUrl.searchParams.get("sesion") === "vencida";
+
+  if (signedIn && isLoginRoute && !vieneDeSesionVencida) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
+    url.search = "";
     return redirectWithSession(url, supabaseResponse);
   }
 

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { ReportPaymentDialog } from "@/components/subscription/report-payment-dialog";
-import { currentAccount } from "@/lib/auth-server";
+import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
 import { getEffectiveStatus } from "@/lib/subscription";
 import type { ProfileStatus } from "@/types/database.types";
 
@@ -37,7 +37,7 @@ export default async function SuscripcionPage() {
   const account = await currentAccount();
 
   if (!account) {
-    redirect("/login");
+    redirect(LOGIN_SESION_VENCIDA);
   }
 
   if (account.profile?.role === "super_admin") {

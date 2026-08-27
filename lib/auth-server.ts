@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import { identify } from "@/lib/auth-identity";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRole, ProfileStatus } from "@/types/database.types";
 
@@ -12,6 +13,17 @@ export interface AccountProfile {
   subscription_ends_at: string | null;
   logo_url: string | null;
 }
+
+/**
+ * A dónde se manda a alguien cuando el servidor no pudo confirmar su sesión.
+ *
+ * Lleva marcador a propósito: es el freno de mano del lazo. Si el middleware
+ * y el layout volvieran a discrepar, este parámetro hace que el middleware NO
+ * lo devuelva al inicio y que la pantalla de login no lo empuje sola. En el
+ * peor caso se queda en el login, que es molesto pero termina; sin esto, el
+ * navegador rebota para siempre.
+ */
+export const LOGIN_SESION_VENCIDA = "/login?sesion=vencida";
 
 export interface Account {
   userId: string;
@@ -26,13 +38,11 @@ export interface Account {
  *
  * 1. `cache()` de React: aunque el layout, la página y un componente la pidan,
  *    en un mismo render se resuelve UNA sola vez.
- * 2. `getClaims()` en vez de `getUser()`: si el proyecto de Supabase usa
- *    llaves asimétricas, verifica la firma del JWT localmente y no sale a la
- *    red. Si todavía usa el secreto compartido, cae solo a `getUser()` y se
- *    comporta como antes — no hay nada que romper.
+ * 2. `getClaims()` en vez de `getUser()`: con llaves asimétricas verifica la
+ *    firma del JWT localmente y no sale a la red.
  *
- * Para RENDERIZAR esto sobra. Los server actions que mueven plata siguen
- * usando `getUser()`, que revalida contra el servidor de Auth.
+ * Nunca devuelve "no hay sesión" por un tropiezo de red: ver `identificar()`
+ * más abajo, que es donde estaba el lazo de redirecciones.
  */
 export const currentAccount = cache(async (): Promise<Account | null> => {
   if (
@@ -44,12 +54,8 @@ export const currentAccount = cache(async (): Promise<Account | null> => {
 
   const supabase = createClient();
 
-  const { data, error } = await supabase.auth.getClaims();
-  const claims = data?.claims as
-    | { sub?: string; email?: string }
-    | undefined;
-
-  if (error || !claims?.sub) {
+  const identidad = await identify(supabase);
+  if (!identidad) {
     return null;
   }
 
@@ -58,12 +64,12 @@ export const currentAccount = cache(async (): Promise<Account | null> => {
     .select(
       "full_name, business_name, role, status, trial_ends_at, subscription_ends_at, logo_url"
     )
-    .eq("id", claims.sub)
+    .eq("id", identidad.userId)
     .maybeSingle();
 
   return {
-    userId: claims.sub,
-    email: claims.email ?? "",
+    userId: identidad.userId,
+    email: identidad.email,
     profile: (profile as AccountProfile | null) ?? null,
   };
 });
