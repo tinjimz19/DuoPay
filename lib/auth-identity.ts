@@ -32,6 +32,8 @@
  * revalida contra el servidor de Auth.
  */
 
+import { conLimite, LIMITE_RENDER_MS } from "@/lib/con-limite";
+
 export interface Identity {
   userId: string;
   email: string;
@@ -53,27 +55,28 @@ export interface AuthReader {
 export async function identify(
   supabase: AuthReader
 ): Promise<Identity | null> {
-  try {
-    const { data, error } = await supabase.auth.getClaims();
-    const claims = data?.claims;
-    if (!error && claims?.sub) {
-      return { userId: claims.sub, email: claims.email ?? "" };
-    }
-  } catch {
-    // Da igual si devolvió error o si lanzó: en ambos casos hay plan B.
+  // Con reloj las dos: la misma tormenta de reintentos que tumbaba el
+  // middleware (8 intentos, 25 s medidos) también puede colgar el render.
+  const porClaims = await conLimite(
+    supabase.auth.getClaims(),
+    LIMITE_RENDER_MS,
+    null
+  );
+  const claims = porClaims?.data?.claims;
+  if (porClaims && !porClaims.error && claims?.sub) {
+    return { userId: claims.sub, email: claims.email ?? "" };
   }
 
   // Plan B: la misma cookie que mira el middleware. Que los dos lean lo
   // mismo es lo que hace imposible el rebote.
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session?.user?.id) {
-      return { userId: session.user.id, email: session.user.email ?? "" };
-    }
-  } catch {
-    // Sin cookie utilizable no hay nada que hacer.
+  const porCookie = await conLimite(
+    supabase.auth.getSession(),
+    LIMITE_RENDER_MS,
+    null
+  );
+  const session = porCookie?.data?.session;
+  if (session?.user?.id) {
+    return { userId: session.user.id, email: session.user.email ?? "" };
   }
 
   return null;
