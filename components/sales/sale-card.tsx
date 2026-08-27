@@ -250,9 +250,12 @@ function PaymentRow({
 export function SaleCard({
   sale,
   businessName,
+  paymentBlock,
 }: {
   sale: SaleCardData;
   businessName?: string | null;
+  /** Datos de cobro ya armados en el servidor, para el mensaje. */
+  paymentBlock?: string[];
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -548,6 +551,7 @@ export function SaleCard({
                           remaining,
                         },
                       ],
+                      paymentBlock,
                     })
                   )}
                   target="_blank"

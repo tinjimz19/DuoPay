@@ -59,11 +59,13 @@ function ClientCard({
   businessName,
   quincenaLabel,
   tone,
+  paymentBlock,
 }: {
   client: CobranzaClient;
   businessName: string | null;
   quincenaLabel: string;
   tone: "atrasado" | "toca" | "aldia";
+  paymentBlock?: string[];
 }) {
   const [open, setOpen] = React.useState(false);
   const [dialog, setDialog] = React.useState<{
@@ -94,6 +96,7 @@ function ClientCard({
             businessName,
             clientName: client.name,
             quincenaLabel,
+            paymentBlock,
             items: cobrables.map((s) => ({
               description: s.description,
               amount: s.dueNow,
@@ -287,6 +290,7 @@ function Section({
   businessName,
   quincenaLabel,
   collapsible,
+  paymentBlock,
 }: {
   title: string;
   hint?: string;
@@ -295,6 +299,7 @@ function Section({
   businessName: string | null;
   quincenaLabel: string;
   collapsible?: boolean;
+  paymentBlock?: string[];
 }) {
   const [open, setOpen] = React.useState(!collapsible);
 
@@ -332,6 +337,7 @@ function Section({
             tone={tone}
             businessName={businessName}
             quincenaLabel={quincenaLabel}
+            paymentBlock={paymentBlock}
           />
         ))}
     </section>
@@ -344,12 +350,14 @@ export function CobranzaList({
   alDia,
   businessName,
   quincenaLabel,
+  paymentBlock,
 }: {
   atrasados: CobranzaClient[];
   tocaAhora: CobranzaClient[];
   alDia: CobranzaClient[];
   businessName: string | null;
   quincenaLabel: string;
+  paymentBlock?: string[];
 }) {
   const vacio =
     atrasados.length === 0 && tocaAhora.length === 0 && alDia.length === 0;
@@ -374,6 +382,7 @@ export function CobranzaList({
         tone="atrasado"
         businessName={businessName}
         quincenaLabel={quincenaLabel}
+        paymentBlock={paymentBlock}
       />
       <Section
         title="Toca ahora"
@@ -381,6 +390,7 @@ export function CobranzaList({
         tone="toca"
         businessName={businessName}
         quincenaLabel={quincenaLabel}
+        paymentBlock={paymentBlock}
       />
       {alDia.length > 0 && (
         <div>
@@ -390,6 +400,7 @@ export function CobranzaList({
             tone="aldia"
             businessName={businessName}
             quincenaLabel={quincenaLabel}
+            paymentBlock={paymentBlock}
             collapsible
           />
           <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">

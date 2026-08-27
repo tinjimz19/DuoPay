@@ -1,19 +1,35 @@
 import { formatCurrency, normalizePhone } from "@/lib/format";
 
+/**
+ * Los mensajes de WhatsApp que la tienda le manda al cliente.
+ *
+ * `paymentBlock` son las líneas con los datos de cobro, ya armadas en el
+ * servidor por `paymentMethodsBlock()`. Llegan hechas texto a propósito:
+ * así los componentes de pantalla no tienen que saber nada de métodos de
+ * pago, solo pasarlas de largo. De poco sirve recordarle la deuda a
+ * alguien si después tiene que escribirte para preguntar dónde pagar.
+ */
+
 export interface DebtItem {
   description: string;
   remaining: number;
+}
+
+/** Datos de pago + despedida, que van siempre al final del mensaje. */
+function cierre(paymentBlock: string[] | undefined, despedida: string): string[] {
+  return [...(paymentBlock ?? []), "", despedida];
 }
 
 export function buildDebtReminderMessage(params: {
   businessName: string | null | undefined;
   clientName: string;
   items: DebtItem[];
+  paymentBlock?: string[];
 }): string {
   const business = params.businessName?.trim() || "nuestra tienda";
   const total = params.items.reduce((sum, item) => sum + item.remaining, 0);
 
-  const lines = [
+  return [
     `Hola ${params.clientName}, te saluda ${business}.`,
     "",
     "Te recuerdo tu saldo pendiente:",
@@ -23,17 +39,15 @@ export function buildDebtReminderMessage(params: {
     ),
     "",
     `Total pendiente: ${formatCurrency(total)}`,
-    "",
-    "Cuando puedas haznos el abono. ¡Gracias!",
-  ];
-
-  return lines.join("\n");
+    ...cierre(params.paymentBlock, "Cuando puedas haznos el abono. ¡Gracias!"),
+  ].join("\n");
 }
 
 export function buildTotalDebtReminderMessage(params: {
   businessName: string | null | undefined;
   clientName: string;
   total: number;
+  paymentBlock?: string[];
 }): string {
   const business = params.businessName?.trim() || "nuestra tienda";
 
@@ -41,8 +55,7 @@ export function buildTotalDebtReminderMessage(params: {
     `Hola ${params.clientName}, te saluda ${business}.`,
     "",
     `Te recuerdo que tienes un saldo pendiente de ${formatCurrency(params.total)}.`,
-    "",
-    "Cuando puedas haznos el abono. ¡Gracias!",
+    ...cierre(params.paymentBlock, "Cuando puedas haznos el abono. ¡Gracias!"),
   ].join("\n");
 }
 
@@ -61,6 +74,7 @@ export function buildQuincenaReminderMessage(params: {
   quincenaLabel: string;
   items: QuincenaItem[];
   behind: number;
+  paymentBlock?: string[];
 }): string {
   const business = params.businessName?.trim() || "nuestra tienda";
   const total = params.items.reduce((sum, item) => sum + item.amount, 0);
@@ -89,7 +103,7 @@ export function buildQuincenaReminderMessage(params: {
     );
   }
 
-  lines.push("", "Cuando puedas me avisas. ¡Gracias!");
+  lines.push(...cierre(params.paymentBlock, "Cuando puedas me avisas. ¡Gracias!"));
 
   return lines.join("\n");
 }

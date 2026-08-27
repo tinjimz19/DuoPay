@@ -1,4 +1,4 @@
-import { AccountSheet } from "@/components/account-sheet";
+import { AccountMenu } from "@/components/account-menu";
 import {
   SubscriptionBadge,
   type SubscriptionTone,
@@ -10,11 +10,13 @@ export function Header({
   fullName,
   businessName,
   subscription,
+  logoUrl,
 }: {
   email: string;
   fullName: string | null;
   businessName: string | null;
   subscription: { label: string; tone: SubscriptionTone } | null;
+  logoUrl: string | null;
 }) {
   const firstName = (fullName ?? email).split(" ")[0];
 
@@ -39,10 +41,11 @@ export function Header({
         </div>
         <div className="flex items-center gap-1">
           <ThemeToggle />
-          <AccountSheet
+          <AccountMenu
             email={email}
             fullName={fullName}
             businessName={businessName}
+            logoUrl={logoUrl}
           />
         </div>
       </div>

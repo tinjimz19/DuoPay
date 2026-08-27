@@ -10,6 +10,7 @@ export interface AccountProfile {
   status: ProfileStatus;
   trial_ends_at: string | null;
   subscription_ends_at: string | null;
+  logo_url: string | null;
 }
 
 export interface Account {
@@ -55,7 +56,7 @@ export const currentAccount = cache(async (): Promise<Account | null> => {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "full_name, business_name, role, status, trial_ends_at, subscription_ends_at"
+      "full_name, business_name, role, status, trial_ends_at, subscription_ends_at, logo_url"
     )
     .eq("id", claims.sub)
     .maybeSingle();

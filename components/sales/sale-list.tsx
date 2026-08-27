@@ -19,9 +19,12 @@ const FILTERS = [
 export function SaleList({
   sales,
   businessName,
+  paymentBlock,
 }: {
   sales: SaleCardData[];
   businessName?: string | null;
+  /** Datos de cobro ya armados en el servidor, para el mensaje. */
+  paymentBlock?: string[];
 }) {
   const [filter, setFilter] = React.useState<(typeof FILTERS)[number]["value"]>("all");
   const [query, setQuery] = React.useState("");
@@ -76,7 +79,12 @@ export function SaleList({
       ) : (
         <div className="space-y-2">
           {pagina.items.map((sale) => (
-            <SaleCard key={sale.id} sale={sale} businessName={businessName} />
+            <SaleCard
+              key={sale.id}
+              sale={sale}
+              businessName={businessName}
+              paymentBlock={paymentBlock}
+            />
           ))}
         </div>
       )}

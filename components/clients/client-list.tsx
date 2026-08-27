@@ -31,9 +31,12 @@ export interface ClientWithBalance {
 export function ClientList({
   clients,
   businessName,
+  paymentBlock,
 }: {
   clients: ClientWithBalance[];
   businessName?: string | null;
+  /** Datos de cobro ya armados en el servidor, para el mensaje. */
+  paymentBlock?: string[];
 }) {
   const [query, setQuery] = React.useState("");
 
@@ -106,6 +109,7 @@ export function ClientList({
                           businessName,
                           clientName: client.name,
                           total: client.balance,
+                          paymentBlock,
                         })
                       )}
                       target="_blank"

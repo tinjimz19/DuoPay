@@ -13,6 +13,13 @@ export type ProfileRole = "owner" | "super_admin";
 export type ProfileStatus = "TRIAL" | "ACTIVE" | "SUSPENDED" | "EXPIRED";
 export type PaymentReportStatus = "PENDING" | "CONFIRMED" | "REJECTED";
 export type StockMovementKind = "ENTRADA" | "VENTA" | "SALIDA" | "AJUSTE";
+export type PaymentMethodKind =
+  | "PAGO_MOVIL"
+  | "TRANSFERENCIA"
+  | "ZELLE"
+  | "BINANCE"
+  | "EFECTIVO"
+  | "OTRO";
 
 export interface Database {
   public: {
@@ -26,6 +33,7 @@ export interface Database {
           status: ProfileStatus;
           trial_ends_at: string | null;
           subscription_ends_at: string | null;
+          logo_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -36,6 +44,7 @@ export interface Database {
           status?: ProfileStatus;
           trial_ends_at?: string | null;
           subscription_ends_at?: string | null;
+          logo_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -46,6 +55,7 @@ export interface Database {
           status?: ProfileStatus;
           trial_ends_at?: string | null;
           subscription_ends_at?: string | null;
+          logo_url?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -306,6 +316,48 @@ export interface Database {
           }
         ];
       };
+      payment_methods: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: PaymentMethodKind;
+          label: string | null;
+          bank: string | null;
+          account: string | null;
+          holder: string | null;
+          document: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          kind: PaymentMethodKind;
+          label?: string | null;
+          bank?: string | null;
+          account?: string | null;
+          holder?: string | null;
+          document?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: PaymentMethodKind;
+          label?: string | null;
+          bank?: string | null;
+          account?: string | null;
+          holder?: string | null;
+          document?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       stock_movements: {
         Row: {
           id: string;
@@ -425,6 +477,7 @@ export interface Database {
       profile_status: ProfileStatus;
       payment_report_status: PaymentReportStatus;
       stock_movement_kind: StockMovementKind;
+      payment_method_kind: PaymentMethodKind;
     };
     CompositeTypes: {
       [_ in never]: never;

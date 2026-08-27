@@ -28,6 +28,8 @@ import {
   formatTimeShort,
   normalizePhone,
 } from "@/lib/format";
+import { paymentMethodsBlock } from "@/lib/payment-methods";
+import { activePaymentMethods } from "@/lib/settings-server";
 import {
   buildDebtReminderMessage,
   whatsappReminderUrl,
@@ -123,6 +125,7 @@ export default async function ClienteDetailPage({
             businessName: profile?.business_name ?? null,
             clientName: client.name,
             items: openSales,
+            paymentBlock: paymentMethodsBlock(await activePaymentMethods()),
           })
         )
       : null;

@@ -7,6 +7,8 @@ import {
   cobranzaBadgeLabel,
   saleSchedule,
 } from "@/lib/quincenas";
+import { paymentMethodsBlock } from "@/lib/payment-methods";
+import { activePaymentMethods } from "@/lib/settings-server";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PaymentRecord,
@@ -18,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function VentasPage() {
   const supabase = createClient();
 
-  const [{ data: sales }, { data: profile }] = await Promise.all([
+  const [{ data: sales }, { data: profile }, methods] = await Promise.all([
     supabase
       .from("sales")
       .select(
@@ -27,6 +29,7 @@ export default async function VentasPage() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("business_name").maybeSingle(),
+    activePaymentMethods(),
   ]);
 
   const mapped: SaleCardData[] = (sales ?? []).map((s) => {
@@ -92,6 +95,7 @@ export default async function VentasPage() {
       <SaleList
         sales={mapped}
         businessName={profile?.business_name ?? null}
+        paymentBlock={paymentMethodsBlock(methods)}
       />
     </div>
   );

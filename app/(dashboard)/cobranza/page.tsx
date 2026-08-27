@@ -15,6 +15,8 @@ import {
   quincenaLongLabel,
   saleSchedule,
 } from "@/lib/quincenas";
+import { paymentMethodsBlock } from "@/lib/payment-methods";
+import { activePaymentMethods } from "@/lib/settings-server";
 import { createClient } from "@/lib/supabase/server";
 import type { ProductCategory } from "@/types/database.types";
 
@@ -35,7 +37,7 @@ interface SaleRow {
 export default async function CobranzaPage() {
   const supabase = createClient();
 
-  const [{ data: sales }, { data: profile }] = await Promise.all([
+  const [{ data: sales }, { data: profile }, methods] = await Promise.all([
     supabase
       .from("sales")
       .select(
@@ -45,6 +47,7 @@ export default async function CobranzaPage() {
       .neq("status", "COMPLETED")
       .order("created_at", { ascending: true }),
     supabase.from("profiles").select("business_name").maybeSingle(),
+    activePaymentMethods(),
   ]);
 
   const current = currentQuincena();
@@ -195,6 +198,7 @@ export default async function CobranzaPage() {
         alDia={alDia}
         businessName={profile?.business_name ?? null}
         quincenaLabel={quincenaLabel(current)}
+        paymentBlock={paymentMethodsBlock(methods)}
       />
     </div>
   );

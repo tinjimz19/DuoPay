@@ -758,3 +758,113 @@ CREATE TRIGGER trg_products_restore_sync
   EXECUTE FUNCTION public.sync_product_stock_on_restore();
 
 -- Para una base que YA existe, ejecuta supabase/patch-03-inventario.sql.
+
+
+-- 20. CONFIGURACIÓN DE LA TIENDA · LOGO Y MÉTODOS DE PAGO
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS logo_url TEXT;
+
+-- Bucket PÚBLICO a propósito: el logo se pinta en la cabecera en cada
+-- render, y firmar una URL privada cada vez sería un viaje de red por
+-- navegación.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('store-logos', 'store-logos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Tienda sube su logo" ON storage.objects;
+CREATE POLICY "Tienda sube su logo"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'store-logos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda reemplaza su logo" ON storage.objects;
+CREATE POLICY "Tienda reemplaza su logo"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'store-logos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda borra su logo" ON storage.objects;
+CREATE POLICY "Tienda borra su logo"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'store-logos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Los logos se ven publicamente" ON storage.objects;
+CREATE POLICY "Los logos se ven publicamente"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'store-logos');
+
+-- Todos los métodos comparten las mismas cuatro columnas: el "teléfono"
+-- de un Pago Móvil y el "correo" de un Zelle ocupan el mismo lugar. Solo
+-- cambia qué se pide y cómo se rotula en pantalla (ver lib/payment-methods.ts).
+DO $$ BEGIN
+  CREATE TYPE payment_method_kind AS ENUM (
+    'PAGO_MOVIL', 'TRANSFERENCIA', 'ZELLE', 'BINANCE', 'EFECTIVO', 'OTRO'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  kind payment_method_kind NOT NULL,
+  label TEXT,
+  bank TEXT,
+  account TEXT,
+  holder TEXT,
+  document TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.payment_methods ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Aislamiento por usuario en metodos de pago" ON public.payment_methods;
+CREATE POLICY "Aislamiento por usuario en metodos de pago"
+  ON public.payment_methods FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_payment_methods_user
+  ON public.payment_methods(user_id, sort_order, created_at);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.payment_methods TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.validate_payment_method_owner()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.user_id IS DISTINCT FROM auth.uid() AND NOT public.is_super_admin() THEN
+    RAISE EXCEPTION 'El método de pago no pertenece a esta tienda';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_validate_payment_method_owner ON public.payment_methods;
+CREATE TRIGGER trg_validate_payment_method_owner
+  BEFORE INSERT OR UPDATE ON public.payment_methods
+  FOR EACH ROW EXECUTE FUNCTION public.validate_payment_method_owner();
+
+
+-- 21. AL REGISTRARSE SE GUARDA EL NOMBRE DEL NEGOCIO
+-- El formulario siempre lo mandó dentro de raw_user_meta_data, pero esta
+-- función solo leía full_name: business_name se quedaba en auth.users sin
+-- que nadie lo copiara. Por eso había que entrar y volver a escribirlo.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, business_name, trial_ends_at)
+  VALUES (
+    new.id,
+    NULLIF(TRIM(new.raw_user_meta_data->>'full_name'), ''),
+    NULLIF(TRIM(new.raw_user_meta_data->>'business_name'), ''),
+    NOW() + INTERVAL '3 days'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Para una base que YA existe, ejecuta supabase/patch-04-configuracion.sql:
+-- además de esto, rescata los nombres de negocio que se quedaron perdidos.

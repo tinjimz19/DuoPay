@@ -1,5 +1,7 @@
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { ClientList } from "@/components/clients/client-list";
+import { paymentMethodsBlock } from "@/lib/payment-methods";
+import { activePaymentMethods } from "@/lib/settings-server";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ClientesPage() {
   const supabase = createClient();
 
-  const [{ data: clients }, { data: sales }, { data: profile }] =
+  const [{ data: clients }, { data: sales }, { data: profile }, methods] =
     await Promise.all([
       supabase
         .from("clients")
@@ -19,6 +21,7 @@ export default async function ClientesPage() {
         .select("client_id, total_amount, amount_paid, status")
         .is("deleted_at", null),
       supabase.from("profiles").select("business_name").maybeSingle(),
+      activePaymentMethods(),
     ]);
 
   const balances = new Map<string, number>();
@@ -50,7 +53,11 @@ export default async function ClientesPage() {
         </div>
         <ClientFormDialog />
       </div>
-      <ClientList clients={enriched} businessName={profile?.business_name ?? null} />
+      <ClientList
+        clients={enriched}
+        businessName={profile?.business_name ?? null}
+        paymentBlock={paymentMethodsBlock(methods)}
+      />
     </div>
   );
 }
