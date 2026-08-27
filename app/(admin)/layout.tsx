@@ -43,7 +43,9 @@ export default async function AdminLayout({
             <span className="hidden sm:inline">Panel admin</span>
           </Link>
           <AdminNav pendingCount={pendingReports ?? 0} />
-          <div className="flex items-center gap-2">
+          {/* En el teléfono la insignia y el salir viven dentro de la
+              hamburguesa: aquí solo estorbaban el ancho. */}
+          <div className="hidden items-center gap-2 sm:flex">
             <span className="hidden items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 sm:flex dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">
               <ShieldCheck className="h-3.5 w-3.5" />
               Super admin
