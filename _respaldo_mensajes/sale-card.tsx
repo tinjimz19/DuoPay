@@ -45,7 +45,7 @@ import { Progress } from "@/components/ui/progress";
 import { formatBs, formatCurrency, formatTimeShort } from "@/lib/format";
 import { moneyInputValue, parseMoney } from "@/lib/money";
 import {
-  buildInstallmentReminderMessage,
+  buildDebtReminderMessage,
   whatsappReminderUrl,
 } from "@/lib/reminders";
 import {
@@ -251,22 +251,12 @@ export function SaleCard({
   sale,
   businessName,
   paymentBlock,
-  rate,
   showClient = true,
 }: {
   sale: SaleCardData;
   businessName?: string | null;
   /** Datos de cobro ya armados en el servidor, para el mensaje. */
   paymentBlock?: string[];
-  /**
-   * La tasa del BCV, ya traída en el servidor.
-   *
-   * Antes cada tarjeta la pedía por su cuenta al abrir su diálogo. Ahora
-   * hace falta también para el recordatorio, que se arma sin abrir nada:
-   * pedirla por tarjeta serían tantas consultas como ventas tenga la
-   * lista. Baja una vez, desde la página.
-   */
-  rate?: number | null;
   /** En la ficha de un cliente sobra repetir su nombre en cada venta. */
   showClient?: boolean;
 }) {
@@ -277,7 +267,22 @@ export function SaleCard({
   const [pending, startTransition] = React.useTransition();
   const [customAmount, setCustomAmount] = React.useState("");
   const [notes, setNotes] = React.useState("");
-  const euroRate = rate ?? null;
+  const [euroRate, setEuroRate] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let active = true;
+    getEuroRate()
+      .then((r) => {
+        if (active) setEuroRate(r.rate);
+      })
+      .catch(() => {
+        if (active) setEuroRate(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   const paid = Number(sale.amount_paid);
   const total = Number(sale.total_amount);
@@ -552,18 +557,15 @@ export function SaleCard({
                 <a
                   href={whatsappReminderUrl(
                     sale.client_phone,
-                    buildInstallmentReminderMessage({
+                    buildDebtReminderMessage({
                       businessName,
                       clientName: sale.client_name,
                       items: [
                         {
                           description: sale.item_description,
-                          // La misma cifra que propone el botón de cobrar
-                          // del diálogo. Antes aquí iba el saldo entero.
-                          amount: quincenaDue ?? suggested,
+                          remaining,
                         },
                       ],
-                      rate: euroRate,
                       paymentBlock,
                     })
                   )}

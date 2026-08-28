@@ -1,4 +1,3 @@
-import { getEuroRate } from "@/actions/rates";
 import {
   HandCoins,
   PackagePlus,
@@ -32,8 +31,7 @@ import {
 import { paymentMethodsBlock } from "@/lib/payment-methods";
 import { activePaymentMethods } from "@/lib/settings-server";
 import {
-  buildInstallmentReminderMessage,
-  installmentFor,
+  buildDebtReminderMessage,
   whatsappReminderUrl,
 } from "@/lib/reminders";
 import type { ProductCategory, PreorderStatus } from "@/types/database.types";
@@ -113,41 +111,20 @@ export default async function ClienteDetailPage({
 
   const whatsappUrl = `https://wa.me/${normalizePhone(client.phone)}`;
 
-  /*
-    Una línea por compra, con su CUOTA y no con el saldo entero.
-
-    Antes decía "falta USD 240" por cada venta. Es el mensaje equivocado
-    para cobrar: nadie paga 240 de golpe y la cifra grande desanima. Lo
-    que se pide hoy es la cuota, y la decide `installmentFor`, que es la
-    misma regla que usa el botón de cobrar de cada tarjeta.
-  */
-  // Una sola vez para toda la página: la usan el recordatorio de arriba y
-  // cada tarjeta de venta. Dentro del `.map` no se puede esperar nada.
-  const tasa = await tasaParaMensajes();
-
   const openSales = saleList
     .filter((s) => s.status !== "COMPLETED")
-    .map((s) => {
-      const remaining = Number(s.total_amount) - Number(s.amount_paid);
-      return {
-        description: s.item_description,
-        amount: installmentFor({
-          dueNow: saleSchedule(s).dueNow,
-          installmentAmount: Number(s.installment_amount),
-          remaining,
-        }),
-      };
-    })
-    .filter((s) => s.amount > 0);
+    .map((s) => ({
+      description: s.item_description,
+      remaining: Number(s.total_amount) - Number(s.amount_paid),
+    }));
   const reminderUrl =
     remainingTotal > 0 && openSales.length > 0
       ? whatsappReminderUrl(
           client.phone,
-          buildInstallmentReminderMessage({
+          buildDebtReminderMessage({
             businessName: profile?.business_name ?? null,
             clientName: client.name,
             items: openSales,
-            rate: tasa,
             paymentBlock: paymentMethodsBlock(await activePaymentMethods()),
           })
         )
@@ -262,7 +239,6 @@ export default async function ClienteDetailPage({
                     };
                   })(),
                 }}
-                rate={tasa}
                 showClient={false}
               />
             ))}
@@ -348,20 +324,4 @@ export default async function ClienteDetailPage({
       )}
     </div>
   );
-}
-
-/**
- * La tasa del BCV para los mensajes, o null si no se pudo traer.
- *
- * Nunca lanza: un recordatorio sin bolívares se manda igual, y una página
- * de ventas que no carga porque la API del BCV está caída sería un mal
- * negocio. Va cacheada 2 h por `getEuroRate`, así que no es un viaje por
- * cada visita.
- */
-async function tasaParaMensajes(): Promise<number | null> {
-  try {
-    return (await getEuroRate()).rate;
-  } catch {
-    return null;
-  }
 }

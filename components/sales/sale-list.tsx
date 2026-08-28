@@ -20,9 +20,12 @@ export function SaleList({
   sales,
   businessName,
   paymentBlock,
+  rate,
 }: {
   sales: SaleCardData[];
   businessName?: string | null;
+  /** La tasa del BCV, traída una vez en el servidor. */
+  rate?: number | null;
   /** Datos de cobro ya armados en el servidor, para el mensaje. */
   paymentBlock?: string[];
 }) {
@@ -83,6 +86,7 @@ export function SaleList({
               key={sale.id}
               sale={sale}
               businessName={businessName}
+              rate={rate}
               paymentBlock={paymentBlock}
             />
           ))}

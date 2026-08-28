@@ -1,4 +1,6 @@
 import { Plus } from "lucide-react";
+
+import { getEuroRate } from "@/actions/rates";
 import Link from "next/link";
 
 import { SaleList } from "@/components/sales/sale-list";
@@ -31,6 +33,10 @@ export default async function VentasPage() {
     supabase.from("profiles").select("business_name").maybeSingle(),
     activePaymentMethods(),
   ]);
+
+  // La tasa baja UNA vez y se reparte a todas las tarjetas: si la
+  // pidiera cada una, serian tantas consultas como ventas tenga la lista.
+  const tasa = await tasaParaMensajes();
 
   const mapped: SaleCardData[] = (sales ?? []).map((s) => {
     const schedule = saleSchedule({
@@ -96,7 +102,24 @@ export default async function VentasPage() {
         sales={mapped}
         businessName={profile?.business_name ?? null}
         paymentBlock={paymentMethodsBlock(methods)}
+        rate={tasa}
       />
     </div>
   );
+}
+
+/**
+ * La tasa del BCV para los mensajes, o null si no se pudo traer.
+ *
+ * Nunca lanza: un recordatorio sin bolívares se manda igual, y una página
+ * de ventas que no carga porque la API del BCV está caída sería un mal
+ * negocio. Va cacheada 2 h por `getEuroRate`, así que no es un viaje por
+ * cada visita.
+ */
+async function tasaParaMensajes(): Promise<number | null> {
+  try {
+    return (await getEuroRate()).rate;
+  } catch {
+    return null;
+  }
 }
