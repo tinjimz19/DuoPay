@@ -28,6 +28,7 @@ import {
   formatDate,
   formatTimeShort,
   normalizePhone,
+  phoneCallHref,
 } from "@/lib/format";
 import { paymentMethodsBlock } from "@/lib/payment-methods";
 import { activePaymentMethods } from "@/lib/settings-server";
@@ -206,7 +207,7 @@ export default async function ClienteDetailPage({
               <span />
             )}
             <a
-              href={`tel:${client.phone}`}
+              href={phoneCallHref(client.phone)}
               className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <Phone className="h-4 w-4" />

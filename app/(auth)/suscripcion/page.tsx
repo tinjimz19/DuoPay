@@ -5,6 +5,7 @@ import { signOut } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { ReportPaymentDialog } from "@/components/subscription/report-payment-dialog";
 import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
+import { normalizePhone } from "@/lib/format";
 import { getEffectiveStatus } from "@/lib/subscription";
 import type { ProfileStatus } from "@/types/database.types";
 
@@ -59,7 +60,7 @@ export default async function SuscripcionPage() {
   const reason = REASONS[status];
   const whatsappNumber = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? "";
   const whatsappHref = whatsappNumber
-    ? `https://wa.me/${whatsappNumber.replace(/[^\d]/g, "")}?text=${encodeURIComponent(
+    ? `https://wa.me/${normalizePhone(whatsappNumber)}?text=${encodeURIComponent(
         "Hola, quiero activar mi suscripción de DuoPay ($10/mes)"
       )}`
     : null;
