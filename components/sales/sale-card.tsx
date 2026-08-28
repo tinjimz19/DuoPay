@@ -19,7 +19,6 @@ import {
   recordPayment,
   updatePayment,
 } from "@/actions/sale-actions";
-import { getEuroRate } from "@/actions/rates";
 import { CategoryBadge } from "@/components/category-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SaleStatusBadge } from "@/components/status-badge";
