@@ -360,226 +360,613 @@ CREATE INDEX IF NOT EXISTS idx_sales_deleted_at     ON public.sales(user_id) WHE
 CREATE INDEX IF NOT EXISTS idx_payments_deleted_at  ON public.payments(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_preorders_deleted_at ON public.preorders(user_id) WHERE deleted_at IS NULL;
 
+-- ------------------------------------------------------------
+-- 11. ORIGEN DEL BORRADO EN LA PAPELERA
+--    deleted_via NULL     = lo borró el usuario directamente
+--    deleted_via 'sale'   = cayó al borrar su venta
+--    deleted_via 'client' = cayó al borrar su cliente
+-- ------------------------------------------------------------
+ALTER TABLE public.sales    ADD COLUMN IF NOT EXISTS deleted_via TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS deleted_via TEXT;
 
--- 11. PEDIDOS: FOTO DE REFERENCIA Y CONVERSION EN VENTA
--- ---------------------------------------------------------------------
--- 1. LAS DOS COLUMNAS NUEVAS
--- ---------------------------------------------------------------------
---
--- `image_path` guarda la RUTA dentro del depósito, no una dirección web.
--- Es a propósito: el depósito es privado y las direcciones se firman al
--- momento de mostrarlas, con vencimiento. Guardar una dirección firmada
--- en la base sería guardar algo que caduca.
---
--- `sale_id` es lo que impide el error caro: convertir dos veces el mismo
--- pedido y dejar al cliente debiendo el doble. Mientras esté lleno, el
--- botón de convertir no aparece y la función de abajo se niega.
+DO $$ BEGIN
+  ALTER TABLE public.sales
+    ADD CONSTRAINT sales_deleted_via_check
+    CHECK (deleted_via IS NULL OR deleted_via = 'client');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE public.preorders
-  ADD COLUMN IF NOT EXISTS image_path TEXT,
-  ADD COLUMN IF NOT EXISTS sale_id UUID REFERENCES public.sales(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_preorders_sale_id
-  ON public.preorders(sale_id) WHERE sale_id IS NOT NULL;
-
-
--- ---------------------------------------------------------------------
--- 2. EL DEPÓSITO DE FOTOS
--- ---------------------------------------------------------------------
---
--- Privado, igual que `payment-proofs`. Cada tienda solo entra a su propia
--- carpeta: la ruta es `<id-de-la-tienda>/<archivo>` y la política compara
--- esa primera carpeta contra quien está pidiendo. Una tienda no puede ver
--- ni borrar la foto de otra aunque adivine el nombre del archivo.
---
--- El límite de 5 MB y la lista de tipos los aplica el propio depósito, no
--- la aplicación: una validación que vive en el navegador se salta con la
--- consola abierta.
-
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'pedidos', 'pedidos', false, 5242880,
-  ARRAY['image/jpeg', 'image/png', 'image/webp']
-)
-ON CONFLICT (id) DO UPDATE
-  SET file_size_limit = EXCLUDED.file_size_limit,
-      allowed_mime_types = EXCLUDED.allowed_mime_types;
-
-DROP POLICY IF EXISTS "Tienda sube fotos de pedido a su carpeta" ON storage.objects;
-CREATE POLICY "Tienda sube fotos de pedido a su carpeta"
-  ON storage.objects FOR INSERT TO authenticated
-  WITH CHECK (
-    bucket_id = 'pedidos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-DROP POLICY IF EXISTS "Tienda ve sus fotos de pedido" ON storage.objects;
-CREATE POLICY "Tienda ve sus fotos de pedido"
-  ON storage.objects FOR SELECT TO authenticated
-  USING (
-    bucket_id = 'pedidos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
-
--- Reemplazar la foto y quitarla también hacen falta: sin estas dos, una
--- foto equivocada se queda para siempre y ocupando el plan gratuito.
-DROP POLICY IF EXISTS "Tienda reemplaza sus fotos de pedido" ON storage.objects;
-CREATE POLICY "Tienda reemplaza sus fotos de pedido"
-  ON storage.objects FOR UPDATE TO authenticated
-  USING (
-    bucket_id = 'pedidos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-DROP POLICY IF EXISTS "Tienda borra sus fotos de pedido" ON storage.objects;
-CREATE POLICY "Tienda borra sus fotos de pedido"
-  ON storage.objects FOR DELETE TO authenticated
-  USING (
-    bucket_id = 'pedidos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
+DO $$ BEGIN
+  ALTER TABLE public.payments
+    ADD CONSTRAINT payments_deleted_via_check
+    CHECK (deleted_via IS NULL OR deleted_via IN ('sale', 'client'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 
--- ---------------------------------------------------------------------
--- 3. CONVERTIR UN PEDIDO EN VENTA
--- ---------------------------------------------------------------------
---
--- POR QUÉ ESTO VIVE EN LA BASE Y NO EN CADA APLICACIÓN
---
--- Son dos escrituras que tienen que pasar juntas o no pasar: se crea la
--- venta y se marca el pedido. Si se hicieran por separado desde la
--- aplicación y la segunda fallara —se fue el internet justo ahí— quedaría
--- una venta creada y un pedido que todavía muestra el botón de convertir.
--- El siguiente toque crea una SEGUNDA venta y el cliente queda debiendo
--- el doble. Aquí adentro las dos son una sola transacción: o pasan las
--- dos o no pasa ninguna.
---
--- Y hay un segundo motivo: la app móvil habla con la base directamente,
--- sin servidor propio. Si esto viviera en el servidor de la web, el móvil
--- tendría que repetir la lógica, y dos copias de la misma regla siempre
--- terminan diciendo cosas distintas.
---
--- EL CANDADO
---
--- `FOR UPDATE` bloquea la fila del pedido hasta el final de la
--- transacción. Dos toques al mismo tiempo —el dedo nervioso, o el
--- teléfono y la computadora a la vez— entran en fila: el primero
--- convierte, el segundo encuentra `sale_id` lleno y se niega. Sin el
--- candado, los dos leerían "todavía no está convertido" y crearían dos
--- ventas.
---
--- SEGURIDAD
---
--- Va como INVOKER (lo normal), no como DEFINER: las reglas de aislamiento
--- por tienda se siguen aplicando igual que en cualquier otra consulta.
--- Aun así se comprueba a mano que el pedido y el cliente sean de quien
--- llama, porque un `client_id` de otra tienda pasaría las reglas de
--- `sales` —ahí lo que se comprueba es el `user_id` de la venta— y dejaría
--- una venta apuntando a un cliente ajeno.
-
-CREATE OR REPLACE FUNCTION public.convertir_pedido_en_venta(
-  p_pedido      UUID,
-  p_cliente     UUID,
-  p_descripcion TEXT,
-  p_total       NUMERIC,
-  p_cuotas      INT,
-  p_nota        TEXT DEFAULT NULL
-)
-RETURNS UUID
+-- ------------------------------------------------------------
+-- 12. UN ABONO SOLO PUEDE COLGAR DE UNA VENTA DEL MISMO USUARIO
+--    La política RLS de payments solo comprobaba user_id, así que un
+--    cliente malicioso podía insertar un abono contra la venta de otra
+--    tienda. SECURITY DEFINER para poder leer sales sin depender de RLS.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.validate_payment_owner()
+RETURNS TRIGGER
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  v_pedido public.preorders%ROWTYPE;
-  v_venta  UUID;
-  v_quien  UUID := auth.uid();
 BEGIN
-  IF v_quien IS NULL THEN
-    RAISE EXCEPTION 'Se venció la sesión. Vuelve a entrar.';
-  END IF;
-
-  -- El candado. Traer el pedido y dejarlo bloqueado hasta el final.
-  SELECT * INTO v_pedido
-    FROM public.preorders
-   WHERE id = p_pedido
-     AND user_id = v_quien
-     AND deleted_at IS NULL
-     FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Este pedido ya no existe.';
-  END IF;
-
-  IF v_pedido.sale_id IS NOT NULL THEN
-    RAISE EXCEPTION 'Este pedido ya se convirtió en venta.';
-  END IF;
-
-  IF v_pedido.status = 'CANCELLED' THEN
-    RAISE EXCEPTION 'Este pedido está cancelado. Reactívalo antes de convertirlo.';
-  END IF;
-
-  -- El cliente tiene que ser de esta misma tienda.
   IF NOT EXISTS (
-    SELECT 1 FROM public.clients
-     WHERE id = p_cliente AND user_id = v_quien AND deleted_at IS NULL
+    SELECT 1 FROM public.sales s
+     WHERE s.id = NEW.sale_id AND s.user_id = NEW.user_id
   ) THEN
-    RAISE EXCEPTION 'Ese cliente ya no existe.';
+    RAISE EXCEPTION 'El abono no corresponde a una venta de este usuario';
   END IF;
-
-  IF p_total IS NULL OR p_total <= 0 THEN
-    RAISE EXCEPTION 'El monto debe ser mayor a 0.';
-  END IF;
-
-  IF p_cuotas IS NULL OR p_cuotas < 1 OR p_cuotas > 36 THEN
-    RAISE EXCEPTION 'Las cuotas van de 1 a 36.';
-  END IF;
-
-  IF p_descripcion IS NULL OR length(btrim(p_descripcion)) < 3 THEN
-    RAISE EXCEPTION 'Describe la mercancía.';
-  END IF;
-
-  INSERT INTO public.sales (
-    user_id, client_id, item_description, category,
-    total_amount, installments_count, notes
-  )
-  VALUES (
-    v_quien,
-    p_cliente,
-    btrim(p_descripcion),
-    v_pedido.category,          -- la categoría viene del pedido: ya se eligió una vez
-    p_total,
-    p_cuotas,
-    NULLIF(btrim(COALESCE(p_nota, '')), '')
-  )
-  RETURNING id INTO v_venta;
-
-  -- Entregado y enlazado. A partir de aquí el botón de convertir
-  -- desaparece y esta misma función se niega a repetirlo.
-  UPDATE public.preorders
-     SET sale_id = v_venta,
-         status  = 'DELIVERED',
-         client_id = COALESCE(client_id, p_cliente)
-   WHERE id = p_pedido;
-
-  RETURN v_venta;
+  RETURN NEW;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.convertir_pedido_en_venta(
-  UUID, UUID, TEXT, NUMERIC, INT, TEXT
-) TO authenticated;
+DROP TRIGGER IF EXISTS trg_payments_validate_owner ON public.payments;
+CREATE TRIGGER trg_payments_validate_owner
+  BEFORE INSERT OR UPDATE OF sale_id, user_id ON public.payments
+  FOR EACH ROW EXECUTE FUNCTION public.validate_payment_owner();
 
 
--- ---------------------------------------------------------------------
--- COMPROBACIÓN
--- ---------------------------------------------------------------------
--- Después de correr todo, esto tiene que devolver tres filas:
---
---   SELECT 'columna' AS que, column_name AS detalle
---     FROM information_schema.columns
---    WHERE table_name = 'preorders' AND column_name IN ('image_path', 'sale_id')
---   UNION ALL
---   SELECT 'funcion', routine_name
---     FROM information_schema.routines
---    WHERE routine_name = 'convertir_pedido_en_venta';
+-- ------------------------------------------------------------
+-- 13. amount_paid Y status SE DERIVAN DE LA SUMA DE ABONOS
+--    Sin SECURITY DEFINER a propósito: la función corre con los permisos
+--    de quien la dispara, así que RLS sigue impidiendo tocar ventas ajenas.
+--    Una venta en papelera conserva sus cifras congeladas.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.recalc_sale_totals(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_total  NUMERIC(10,2);
+  v_paid   NUMERIC(10,2);
+  v_status sale_status;
+BEGIN
+  IF p_sale_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT total_amount INTO v_total
+    FROM public.sales
+   WHERE id = p_sale_id AND deleted_at IS NULL;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(SUM(amount), 0) INTO v_paid
+    FROM public.payments
+   WHERE sale_id = p_sale_id AND deleted_at IS NULL;
+
+  v_status := (CASE
+    WHEN v_paid >= v_total THEN 'COMPLETED'
+    WHEN v_paid > 0        THEN 'PARTIAL'
+    ELSE                        'PENDING'
+  END)::sale_status;
+
+  UPDATE public.sales
+     SET amount_paid = v_paid,
+         status      = v_status
+   WHERE id = p_sale_id
+     AND (amount_paid IS DISTINCT FROM v_paid
+          OR status   IS DISTINCT FROM v_status);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.sync_sale_totals()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM public.recalc_sale_totals(OLD.sale_id);
+    RETURN OLD;
+  END IF;
+
+  PERFORM public.recalc_sale_totals(NEW.sale_id);
+
+  IF TG_OP = 'UPDATE' AND OLD.sale_id IS DISTINCT FROM NEW.sale_id THEN
+    PERFORM public.recalc_sale_totals(OLD.sale_id);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_payments_sync_sale ON public.payments;
+CREATE TRIGGER trg_payments_sync_sale
+  AFTER INSERT OR UPDATE OR DELETE ON public.payments
+  FOR EACH ROW EXECUTE FUNCTION public.sync_sale_totals();
+
+-- Al sacar una venta de la papelera se recalcula por si acaso.
+-- El WHEN evita recursión: el UPDATE del recálculo no toca deleted_at.
+CREATE OR REPLACE FUNCTION public.sync_sale_totals_on_restore()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  PERFORM public.recalc_sale_totals(NEW.id);
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sales_restore_sync ON public.sales;
+CREATE TRIGGER trg_sales_restore_sync
+  AFTER UPDATE OF deleted_at ON public.sales
+  FOR EACH ROW
+  WHEN (OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL)
+  EXECUTE FUNCTION public.sync_sale_totals_on_restore();
+
+
+-- ------------------------------------------------------------
+-- 14. ÍNDICES DE CONSULTA (dashboard y reportes)
+-- ------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_sales_user_status
+  ON public.sales(user_id, status) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_payments_user_created
+  ON public.payments(user_id, created_at) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_payments_sale_active
+  ON public.payments(sale_id) WHERE deleted_at IS NULL;
+
+-- Para una base que YA tiene datos, ejecuta además
+-- supabase/patch-01-integridad-abonos.sql: cuadra amount_paid con los abonos
+-- existentes y marca el origen de lo que ya está en la papelera.
+
+
+-- 15. COBRANZA POR QUINCENAS
+-- En Venezuela se cobra el 15 y el 1ero. La venta solo guarda desde qué
+-- quincena empieza a cobrarse; cuotas exigibles, atraso y "cuánto toca hoy"
+-- los deriva la app (lib/quincenas.ts).
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS first_charge_date DATE;
+
+DO $$ BEGIN
+  ALTER TABLE public.sales
+    ADD CONSTRAINT sales_first_charge_date_check
+    CHECK (
+      first_charge_date IS NULL
+      OR EXTRACT(DAY FROM first_charge_date) IN (1, 15)
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE public.sales
+  ALTER COLUMN first_charge_date SET DEFAULT (
+    CASE
+      WHEN EXTRACT(DAY FROM (NOW() AT TIME ZONE 'America/Caracas')) < 15
+        THEN (date_trunc('month', NOW() AT TIME ZONE 'America/Caracas')
+              + INTERVAL '14 days')::date
+      ELSE (date_trunc('month', NOW() AT TIME ZONE 'America/Caracas')
+            + INTERVAL '1 month')::date
+    END
+  );
+
+CREATE INDEX IF NOT EXISTS idx_sales_cobranza
+  ON public.sales(user_id, first_charge_date)
+  WHERE deleted_at IS NULL AND status <> 'COMPLETED';
+
+-- Para una base que YA tiene ventas, ejecuta supabase/patch-02-quincenas.sql:
+-- les asigna la quincena que les tocaba según su fecha de creación.
+
+
+-- ------------------------------------------------------------
+-- 16. INVENTARIO · PRODUCTOS
+--    `stock` lo mantiene el trigger de la sección 4.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  name TEXT NOT NULL CHECK (length(btrim(name)) > 0),
+  category product_category NOT NULL DEFAULT 'OTRO',
+  stock INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Aislamiento por usuario en productos" ON public.products;
+CREATE POLICY "Aislamiento por usuario en productos"
+  ON public.products FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Super admin ve productos de tiendas" ON public.products;
+CREATE POLICY "Super admin ve productos de tiendas"
+  ON public.products FOR SELECT USING (public.is_super_admin());
+
+-- Un solo "Camisas" por tienda, sin importar mayúsculas.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_user_name
+  ON public.products(user_id, lower(btrim(name))) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_products_user_active
+  ON public.products(user_id, category) WHERE deleted_at IS NULL;
+
+
+-- ------------------------------------------------------------
+-- 17. INVENTARIO · MOVIMIENTOS
+--    La cantidad va con signo y el CHECK obliga a que concuerde con el
+--    tipo, para que los datos se expliquen solos.
+-- ------------------------------------------------------------
+DO $$ BEGIN
+  CREATE TYPE public.stock_movement_kind AS ENUM
+    ('ENTRADA', 'VENTA', 'SALIDA', 'AJUSTE');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.stock_movements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  sale_id UUID REFERENCES public.sales(id) ON DELETE CASCADE,
+  kind public.stock_movement_kind NOT NULL,
+  quantity INT NOT NULL CHECK (quantity <> 0),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  deleted_via TEXT,
+  CONSTRAINT stock_movements_sign_check CHECK (
+    (kind = 'ENTRADA' AND quantity > 0)
+    OR (kind IN ('VENTA', 'SALIDA') AND quantity < 0)
+    OR kind = 'AJUSTE'
+  ),
+  CONSTRAINT stock_movements_sale_check CHECK (
+    kind = 'VENTA' OR sale_id IS NULL
+  ),
+  CONSTRAINT stock_movements_deleted_via_check CHECK (
+    deleted_via IS NULL OR deleted_via IN ('sale', 'client', 'product')
+  )
+);
+
+ALTER TABLE public.stock_movements ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Aislamiento por usuario en movimientos" ON public.stock_movements;
+CREATE POLICY "Aislamiento por usuario en movimientos"
+  ON public.stock_movements FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Super admin ve movimientos de tiendas" ON public.stock_movements;
+CREATE POLICY "Super admin ve movimientos de tiendas"
+  ON public.stock_movements FOR SELECT USING (public.is_super_admin());
+
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product
+  ON public.stock_movements(product_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_stock_movements_sale
+  ON public.stock_movements(sale_id) WHERE sale_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_stock_movements_user
+  ON public.stock_movements(user_id, created_at) WHERE deleted_at IS NULL;
+
+
+-- ------------------------------------------------------------
+-- 18. UN MOVIMIENTO SOLO TOCA COSAS PROPIAS
+--    La política RLS solo comprueba user_id; sin esto se podría mover el
+--    stock de otra tienda. Mismo agujero que se tapó en payments.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.validate_stock_movement_owner()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.products p
+     WHERE p.id = NEW.product_id AND p.user_id = NEW.user_id
+  ) THEN
+    RAISE EXCEPTION 'El movimiento no corresponde a un producto de este usuario';
+  END IF;
+
+  IF NEW.sale_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.sales s
+     WHERE s.id = NEW.sale_id AND s.user_id = NEW.user_id
+  ) THEN
+    RAISE EXCEPTION 'El movimiento no corresponde a una venta de este usuario';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_stock_movements_validate_owner ON public.stock_movements;
+CREATE TRIGGER trg_stock_movements_validate_owner
+  BEFORE INSERT OR UPDATE OF product_id, sale_id, user_id ON public.stock_movements
+  FOR EACH ROW EXECUTE FUNCTION public.validate_stock_movement_owner();
+
+
+-- ------------------------------------------------------------
+-- 19. products.stock SE DERIVA DE LOS MOVIMIENTOS
+--    Sin SECURITY DEFINER a propósito: RLS sigue protegiendo lo ajeno.
+--    Un producto en papelera conserva su cifra congelada.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.recalc_product_stock(p_product_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_stock INT;
+BEGIN
+  IF p_product_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  PERFORM 1 FROM public.products
+   WHERE id = p_product_id AND deleted_at IS NULL;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(SUM(quantity), 0) INTO v_stock
+    FROM public.stock_movements
+   WHERE product_id = p_product_id AND deleted_at IS NULL;
+
+  UPDATE public.products
+     SET stock = v_stock
+   WHERE id = p_product_id
+     AND stock IS DISTINCT FROM v_stock;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.sync_product_stock()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM public.recalc_product_stock(OLD.product_id);
+    RETURN OLD;
+  END IF;
+
+  PERFORM public.recalc_product_stock(NEW.product_id);
+
+  IF TG_OP = 'UPDATE' AND OLD.product_id IS DISTINCT FROM NEW.product_id THEN
+    PERFORM public.recalc_product_stock(OLD.product_id);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_stock_movements_sync ON public.stock_movements;
+CREATE TRIGGER trg_stock_movements_sync
+  AFTER INSERT OR UPDATE OR DELETE ON public.stock_movements
+  FOR EACH ROW EXECUTE FUNCTION public.sync_product_stock();
+
+-- Al sacar un producto de la papelera se recalcula.
+-- El WHEN evita recursión: el UPDATE del recálculo no toca deleted_at.
+CREATE OR REPLACE FUNCTION public.sync_product_stock_on_restore()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  PERFORM public.recalc_product_stock(NEW.id);
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_products_restore_sync ON public.products;
+CREATE TRIGGER trg_products_restore_sync
+  AFTER UPDATE OF deleted_at ON public.products
+  FOR EACH ROW
+  WHEN (OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL)
+  EXECUTE FUNCTION public.sync_product_stock_on_restore();
+
+-- Para una base que YA existe, ejecuta supabase/patch-03-inventario.sql.
+
+
+-- 20. CONFIGURACIÓN DE LA TIENDA · LOGO Y MÉTODOS DE PAGO
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS logo_url TEXT;
+
+-- Bucket PÚBLICO a propósito: el logo se pinta en la cabecera en cada
+-- render, y firmar una URL privada cada vez sería un viaje de red por
+-- navegación.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('store-logos', 'store-logos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Tienda sube su logo" ON storage.objects;
+CREATE POLICY "Tienda sube su logo"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'store-logos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda reemplaza su logo" ON storage.objects;
+CREATE POLICY "Tienda reemplaza su logo"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'store-logos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda borra su logo" ON storage.objects;
+CREATE POLICY "Tienda borra su logo"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'store-logos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Los logos se ven publicamente" ON storage.objects;
+CREATE POLICY "Los logos se ven publicamente"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'store-logos');
+
+-- Todos los métodos comparten las mismas cuatro columnas: el "teléfono"
+-- de un Pago Móvil y el "correo" de un Zelle ocupan el mismo lugar. Solo
+-- cambia qué se pide y cómo se rotula en pantalla (ver lib/payment-methods.ts).
+DO $$ BEGIN
+  CREATE TYPE payment_method_kind AS ENUM (
+    'PAGO_MOVIL', 'TRANSFERENCIA', 'ZELLE', 'BINANCE', 'EFECTIVO', 'OTRO'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  kind payment_method_kind NOT NULL,
+  label TEXT,
+  bank TEXT,
+  account TEXT,
+  holder TEXT,
+  document TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.payment_methods ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Aislamiento por usuario en metodos de pago" ON public.payment_methods;
+CREATE POLICY "Aislamiento por usuario en metodos de pago"
+  ON public.payment_methods FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_payment_methods_user
+  ON public.payment_methods(user_id, sort_order, created_at);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.payment_methods TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.validate_payment_method_owner()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.user_id IS DISTINCT FROM auth.uid() AND NOT public.is_super_admin() THEN
+    RAISE EXCEPTION 'El método de pago no pertenece a esta tienda';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_validate_payment_method_owner ON public.payment_methods;
+CREATE TRIGGER trg_validate_payment_method_owner
+  BEFORE INSERT OR UPDATE ON public.payment_methods
+  FOR EACH ROW EXECUTE FUNCTION public.validate_payment_method_owner();
+
+
+-- 21. AL REGISTRARSE SE GUARDA EL NOMBRE DEL NEGOCIO
+-- El formulario siempre lo mandó dentro de raw_user_meta_data, pero esta
+-- función solo leía full_name: business_name se quedaba en auth.users sin
+-- que nadie lo copiara. Por eso había que entrar y volver a escribirlo.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, business_name, trial_ends_at)
+  VALUES (
+    new.id,
+    NULLIF(TRIM(new.raw_user_meta_data->>'full_name'), ''),
+    NULLIF(TRIM(new.raw_user_meta_data->>'business_name'), ''),
+    NOW() + INTERVAL '3 days'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Para una base que YA existe, ejecuta supabase/patch-04-configuracion.sql:
+-- además de esto, rescata los nombres de negocio que se quedaron perdidos.
+
+
+-- 22. CATEGORÍAS ADMINISTRABLES
+-- Dejan de ser un ENUM y pasan a ser datos que administra el super admin.
+-- Las secciones 3, 4 y 16 de arriba crean las columnas con el tipo viejo;
+-- aquí se convierten. En una base nueva el efecto es el mismo.
+CREATE TABLE IF NOT EXISTS public.categories (
+  slug TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'slate',
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT categories_slug_formato CHECK (slug ~ '^[A-Z0-9_]{2,32}$'),
+  CONSTRAINT categories_label_no_vacio CHECK (length(trim(label)) >= 2)
+);
+
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Todos leen las categorias" ON public.categories;
+CREATE POLICY "Todos leen las categorias"
+  ON public.categories FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Solo el super admin crea categorias" ON public.categories;
+CREATE POLICY "Solo el super admin crea categorias"
+  ON public.categories FOR INSERT TO authenticated
+  WITH CHECK (public.is_super_admin());
+
+DROP POLICY IF EXISTS "Solo el super admin edita categorias" ON public.categories;
+CREATE POLICY "Solo el super admin edita categorias"
+  ON public.categories FOR UPDATE TO authenticated
+  USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+DROP POLICY IF EXISTS "Solo el super admin borra categorias" ON public.categories;
+CREATE POLICY "Solo el super admin borra categorias"
+  ON public.categories FOR DELETE TO authenticated
+  USING (public.is_super_admin());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.categories TO authenticated;
+CREATE INDEX IF NOT EXISTS idx_categories_orden ON public.categories(sort_order, slug);
+
+INSERT INTO public.categories (slug, label, color, sort_order) VALUES
+  ('ROPA', 'Ropa', 'indigo', 0), ('CALZADO', 'Calzado', 'violet', 1),
+  ('PERFUME', 'Perfume', 'rose', 2), ('OTRO', 'Otro', 'slate', 3)
+ON CONFLICT (slug) DO NOTHING;
+
+-- De ENUM a texto. El USING conserva el valor de cada fila: ninguna venta
+-- cambia de categoría.
+DO $$
+DECLARE t RECORD;
+BEGIN
+  FOR t IN SELECT * FROM (VALUES
+    ('sales','ROPA'), ('preorders','PERFUME'), ('products','OTRO')
+  ) AS x(tabla, por_defecto) LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name=t.tabla
+        AND column_name='category' AND udt_name='product_category'
+    ) THEN
+      EXECUTE format('ALTER TABLE public.%I ALTER COLUMN category DROP DEFAULT', t.tabla);
+      EXECUTE format('ALTER TABLE public.%I ALTER COLUMN category TYPE TEXT USING category::text', t.tabla);
+      EXECUTE format('ALTER TABLE public.%I ALTER COLUMN category SET DEFAULT %L', t.tabla, t.por_defecto);
+    END IF;
+  END LOOP;
+END $$;
+
+-- La base impide borrar una categoría que alguien usa, y si el slug
+-- cambiara, arrastra el cambio. Es la red de seguridad del historial.
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['sales','preorders','products'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = format('%s_category_fkey', t)) THEN
+      EXECUTE format(
+        'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (category)
+         REFERENCES public.categories(slug) ON UPDATE CASCADE ON DELETE RESTRICT',
+        t, format('%s_category_fkey', t));
+    END IF;
+  END LOOP;
+END $$;
+
+-- El super admin no tiene RLS para leer las ventas de las tiendas, así que
+-- el conteo de uso va en una función cerrada con llave.
+CREATE OR REPLACE FUNCTION public.category_usage()
+RETURNS TABLE (slug TEXT, ventas BIGINT, pedidos BIGINT, productos BIGINT)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_super_admin() THEN
+    RAISE EXCEPTION 'Solo el super admin puede ver el uso de las categorías';
+  END IF;
+  RETURN QUERY
+  SELECT c.slug,
+         (SELECT count(*) FROM public.sales     s WHERE s.category = c.slug),
+         (SELECT count(*) FROM public.preorders p WHERE p.category = c.slug),
+         (SELECT count(*) FROM public.products  r WHERE r.category = c.slug)
+  FROM public.categories c ORDER BY c.sort_order, c.slug;
+END $$;
+
+REVOKE ALL ON FUNCTION public.category_usage() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.category_usage() TO authenticated;
+
+-- Para una base que YA existe, ejecuta supabase/patch-05-categorias.sql.
