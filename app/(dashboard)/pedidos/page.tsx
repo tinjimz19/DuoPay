@@ -16,7 +16,7 @@ export default async function PedidosPage({
     supabase
       .from("preorders")
       .select(
-        "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, clients(name)"
+        "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, image_path, sale_id, clients(name)"
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
@@ -26,6 +26,32 @@ export default async function PedidosPage({
       .is("deleted_at", null)
       .order("name"),
   ]);
+
+  /*
+    Las direcciones de las fotos se firman aquí, en el servidor.
+
+    El depósito es privado: no hay una dirección fija que sirva siempre.
+    Se pide una firmada con vencimiento, y se piden TODAS DE UNA —con
+    `createSignedUrls`, en plural— en vez de una por tarjeta: una lista de
+    cuarenta pedidos serían cuarenta viajes al servidor, uno detrás de
+    otro, y la página tardaría un segundo largo en aparecer.
+
+    Una hora de validez es de sobra para mirar una lista, y es tiempo
+    suficiente para que el enlace no sobreviva a la sesión.
+  */
+  const rutas = (preorders ?? [])
+    .map((p) => p.image_path)
+    .filter((r): r is string => Boolean(r));
+
+  const firmadas = new Map<string, string>();
+  if (rutas.length > 0) {
+    const { data } = await supabase.storage
+      .from("pedidos")
+      .createSignedUrls(Array.from(new Set(rutas)), 60 * 60);
+    for (const item of data ?? []) {
+      if (item.signedUrl && item.path) firmadas.set(item.path, item.signedUrl);
+    }
+  }
 
   const mapped: PreorderCardData[] = (preorders ?? []).map((p) => ({
     id: p.id,
@@ -41,6 +67,9 @@ export default async function PedidosPage({
     status: p.status,
     notes: p.notes,
     created_at: p.created_at,
+    image_path: p.image_path,
+    image_url: p.image_path ? firmadas.get(p.image_path) ?? null : null,
+    sale_id: p.sale_id,
   }));
 
   const openNew = searchParams.nuevo === "1";

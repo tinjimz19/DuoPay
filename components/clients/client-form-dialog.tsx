@@ -56,11 +56,20 @@ type ClientValues = z.infer<typeof clientSchema>;
 export function ClientFormDialog({
   client,
   compact = false,
+  defaultName = "",
   triggerClassName,
   onCreated,
 }: {
   client?: ClientFormData | null;
   compact?: boolean;
+  /**
+   * Nombre con el que abrir el formulario.
+   *
+   * Lo usa la conversión de un pedido: el encargo traía "la señora del
+   * kiosco" escrito suelto y ese nombre aparece ya puesto en vez de
+   * obligar a teclearlo de nuevo delante del cliente.
+   */
+  defaultName?: string;
   triggerClassName?: string;
   onCreated?: (client: { id: string; name: string }) => void;
 }) {
@@ -71,20 +80,11 @@ export function ClientFormDialog({
   const form = useForm<ClientValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
-      name: client?.name ?? "",
+      name: client?.name ?? defaultName ?? "",
       phone: client?.phone ?? "",
       notes: client?.notes ?? "",
     },
   });
-
-  function handleOpenChange(next: boolean) {
-    // El diálogo no se desmonta: sin reset, al reabrirlo salen los datos del
-    // cliente anterior.
-    if (!next && !isEdit) {
-      form.reset({ name: "", phone: "", notes: "" });
-    }
-    setOpen(next);
-  }
 
   async function onSubmit(values: ClientValues) {
     setLoading(true);
@@ -101,17 +101,14 @@ export function ClientFormDialog({
 
     toast.success(isEdit ? "Cliente actualizado" : "Cliente creado");
     const newClientId = "id" in res ? (res as { id: string }).id : undefined;
-    if (!isEdit) {
-      if (onCreated && newClientId) {
-        onCreated({ id: newClientId, name: values.name });
-      }
-      form.reset({ name: "", phone: "", notes: "" });
+    if (!isEdit && onCreated && newClientId) {
+      onCreated({ id: newClientId, name: values.name });
     }
     setOpen(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
           <Button type="button" variant="outline" className={triggerClassName}>
@@ -136,7 +133,7 @@ export function ClientFormDialog({
             <DialogDescription>
               {isEdit
                 ? "Actualiza los datos de contacto del cliente."
-                : "Registra un cliente para venderle a crédito."}
+                : "Registra un cliente para venderle a fiado."}
             </DialogDescription>
           )}
         </DialogHeader>
