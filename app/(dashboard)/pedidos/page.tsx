@@ -16,7 +16,7 @@ export default async function PedidosPage({
     supabase
       .from("preorders")
       .select(
-        "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, clients(name)"
+        "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, image_path, sale_id, clients(name)"
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
@@ -26,6 +26,28 @@ export default async function PedidosPage({
       .is("deleted_at", null)
       .order("name"),
   ]);
+
+  /*
+    Las direcciones de las fotos se firman aquí, en el servidor.
+
+    El depósito es privado: no hay una dirección fija que sirva siempre. Se
+    piden firmadas y con vencimiento, y se piden TODAS DE UNA —`createSignedUrls`,
+    en plural— en vez de una por tarjeta: cuarenta pedidos serían cuarenta
+    viajes en fila y la página tardaría un segundo largo en aparecer.
+  */
+  const rutasDeFoto = (preorders ?? [])
+    .map((p) => p.image_path)
+    .filter((r): r is string => Boolean(r));
+
+  const firmadas = new Map<string, string>();
+  if (rutasDeFoto.length > 0) {
+    const { data: urls } = await supabase.storage
+      .from("pedidos")
+      .createSignedUrls(Array.from(new Set(rutasDeFoto)), 60 * 60);
+    for (const item of urls ?? []) {
+      if (item.path && item.signedUrl) firmadas.set(item.path, item.signedUrl);
+    }
+  }
 
   const mapped: PreorderCardData[] = (preorders ?? []).map((p) => ({
     id: p.id,
@@ -41,6 +63,9 @@ export default async function PedidosPage({
     status: p.status,
     notes: p.notes,
     created_at: p.created_at,
+    image_path: p.image_path,
+    image_url: p.image_path ? (firmadas.get(p.image_path) ?? null) : null,
+    sale_id: p.sale_id,
   }));
 
   const openNew = searchParams.nuevo === "1";

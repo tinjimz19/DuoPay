@@ -240,6 +240,10 @@ export interface Database {
           notes: string | null;
           created_at: string;
           deleted_at: string | null;
+          /** Ruta dentro del depósito `pedidos`, no una dirección web. */
+          image_path: string | null;
+          /** Lleno = este pedido ya se convirtió en esa venta. */
+          sale_id: string | null;
         };
         Insert: {
           id?: string;
@@ -254,6 +258,8 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          image_path?: string | null;
+          sale_id?: string | null;
         };
         Update: {
           id?: string;
@@ -268,6 +274,8 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          image_path?: string | null;
+          sale_id?: string | null;
         };
         Relationships: [
           {
@@ -493,6 +501,25 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      /**
+       * Convierte un pedido en venta: crea la venta y marca el pedido, las
+       * dos cosas dentro de una transacción y con la fila del pedido
+       * bloqueada. Vive en la base porque la app móvil habla con ella
+       * directamente, y porque hechas por separado el pedido se puede
+       * convertir dos veces y el cliente queda debiendo el doble.
+       */
+      convertir_pedido_en_venta: {
+        Args: {
+          p_pedido: string;
+          p_cliente: string;
+          p_descripcion: string;
+          p_total: number;
+          p_cuotas: number;
+          p_nota?: string | null;
+        };
+        /** El id de la venta recién creada. */
+        Returns: string;
+      };
       store_emails: {
         Args: Record<string, never>;
         Returns: {

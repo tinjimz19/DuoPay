@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { ensureClient } from "@/lib/clients-server";
 import {
+  dbErrorMessage,
   newClientSchema,
   optionalUuid,
   zodMessage,
@@ -278,4 +279,147 @@ export async function purgePreorder(id: string) {
 
   revalidatePath("/papelera");
   return { success: true };
+}
+
+
+/**
+ * Guarda (o quita) la ruta de la foto de un pedido.
+ *
+ * Va separada del alta a propósito: la ruta lleva dentro el id del pedido y
+ * ese id no existe hasta que la fila está creada. El orden es guardar el
+ * pedido, subir el archivo, y apuntar aquí dónde quedó.
+ *
+ * El archivo lo sube el navegador directo al depósito, sin pasar por este
+ * servidor: una foto de varios megas ida y vuelta por una acción es lento, y
+ * no hace falta, porque la política del depósito ya impide escribir en la
+ * carpeta de otra tienda.
+ */
+export async function setPreorderImage(id: string, imagePath: string | null) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  // Que la ruta sea de SU carpeta. El depósito ya lo impide al subir, pero
+  // esta columna se puede escribir sin subir nada, y una ruta ajena aquí
+  // serviría para mirar la foto de otra tienda.
+  if (imagePath && !imagePath.startsWith(`${user.id}/`)) {
+    return { success: false, error: "Ruta de foto inválida" };
+  }
+
+  const { error } = await supabase
+    .from("preorders")
+    .update({ image_path: imagePath })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: dbErrorMessage(error.message) };
+  }
+
+  revalidatePath("/pedidos");
+  return { success: true };
+}
+
+const convertPreorderSchema = z.object({
+  preorderId: z.string().uuid(),
+  clientId: optionalUuid,
+  // Igual que en el alta: el cliente se puede crear desde aquí mismo.
+  newClient: newClientSchema.optional().nullable(),
+  itemDescription: z
+    .string()
+    .min(3, "Describe la mercancía")
+    .max(300, "Descripción muy larga"),
+  totalAmount: z.coerce
+    .number({ message: "Monto inválido" })
+    .positive("El monto debe ser mayor a 0")
+    .max(99999999, "El monto es demasiado grande"),
+  installmentsCount: z.coerce
+    .number({ message: "Cuotas inválidas" })
+    .int("Las cuotas deben ser un número entero")
+    .min(1, "Al menos 1 cuota")
+    .max(36, "Máximo 36 cuotas"),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export type ConvertPreorderInput = z.infer<typeof convertPreorderSchema>;
+
+/**
+ * Convierte un pedido en venta.
+ *
+ * LAS DOS ESCRITURAS VAN JUNTAS, Y POR ESO ESTO LLAMA A LA BASE
+ *
+ * Hay que crear la venta Y marcar el pedido. Hechas por separado, si la
+ * segunda falla queda una venta creada y un pedido que todavía enseña el
+ * botón: el siguiente clic crea una SEGUNDA venta y el cliente aparece
+ * debiendo el doble. `convertir_pedido_en_venta` hace las dos dentro de una
+ * transacción, con la fila del pedido bloqueada, así que ni dos clics
+ * seguidos ni el teléfono y la computadora a la vez pueden duplicarla.
+ *
+ * De paso, es lo que evita repetir la lógica en la app móvil, que habla con
+ * la base directamente y no tiene servidor propio.
+ *
+ * Aquí arriba queda solo lo que la base no puede hacer: dar de alta al
+ * cliente si hace falta, validar con mensajes en castellano, y refrescar las
+ * páginas que ahora enseñan algo distinto.
+ */
+export async function convertPreorderToSale(input: ConvertPreorderInput) {
+  const parsedInput = convertPreorderSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { success: false, error: zodMessage(parsedInput.error) };
+  }
+  const parsed = parsedInput.data;
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  let clientId = parsed.clientId;
+  if (!clientId && parsed.newClient) {
+    const created = await ensureClient(supabase, user.id, parsed.newClient);
+    if ("error" in created) {
+      return { success: false, error: created.error };
+    }
+    clientId = created.id;
+  }
+
+  if (!clientId) {
+    return { success: false, error: "Selecciona un cliente" };
+  }
+
+  const { data, error } = await supabase.rpc("convertir_pedido_en_venta", {
+    p_pedido: parsed.preorderId,
+    p_cliente: clientId,
+    p_descripcion: parsed.itemDescription.trim(),
+    p_total: parsed.totalAmount,
+    p_cuotas: parsed.installmentsCount,
+    p_nota: parsed.notes?.trim() || null,
+  });
+
+  if (error) {
+    // Los mensajes de la función ya vienen en castellano y pensados para la
+    // tienda ("Este pedido ya se convirtió en venta"), así que pasan tal
+    // cual. `dbErrorMessage` solo caza el caso de la migración sin correr.
+    return { success: false, error: dbErrorMessage(error.message) };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/pedidos");
+  revalidatePath("/ventas");
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${clientId}`);
+
+  return { success: true, saleId: data as string };
 }
