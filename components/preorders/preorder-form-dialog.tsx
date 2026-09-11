@@ -35,6 +35,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/ui/money-input";
 import { moneyInputValue, parseMoney } from "@/lib/money";
 import {
@@ -358,11 +359,21 @@ export function PreorderFormDialog({
               )}
             />
 
+            {/*
+              Label a secas, NO FormLabel.
+
+              `FormLabel` llama por dentro a `useFormField()`, que LANZA si no
+              está dentro de un `<FormField>`. Este bloque no es un campo del
+              formulario —la foto es un archivo que se sube aparte, no un
+              valor que viaje en el submit—, así que aquí `FormLabel` rompe
+              el diálogo entero al abrirlo. Es el mismo motivo por el que
+              `ClientPicker` usa `Label`.
+            */}
             <div className="space-y-2">
-              <FormLabel>
+              <Label>
                 Foto de referencia{" "}
                 <span className="text-slate-400">(opcional)</span>
-              </FormLabel>
+              </Label>
               {fotoAMostrar ? (
                 <div className="relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
