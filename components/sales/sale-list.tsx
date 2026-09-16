@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const FILTERS = [
-  { value: "all", label: "Todos" },
   { value: "PENDING", label: "Pendientes" },
   { value: "PARTIAL", label: "En cuotas" },
   { value: "COMPLETED", label: "Saldados" },
@@ -29,13 +28,15 @@ export function SaleList({
   /** Datos de cobro ya armados en el servidor, para el mensaje. */
   paymentBlock?: string[];
 }) {
-  const [filter, setFilter] = React.useState<(typeof FILTERS)[number]["value"]>("all");
+  // Se abre en pendientes: lo saldado ya no pide nada.
+  const [filter, setFilter] =
+    React.useState<(typeof FILTERS)[number]["value"]>("PENDING");
   const [query, setQuery] = React.useState("");
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     return sales.filter((s) => {
-      const matchesFilter = filter === "all" || s.status === filter;
+      const matchesFilter = s.status === filter;
       const matchesQuery =
         !q ||
         s.item_description.toLowerCase().includes(q) ||
@@ -56,7 +57,7 @@ export function SaleList({
             setFilter(v as (typeof FILTERS)[number]["value"])
           }
         >
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             {FILTERS.map((f) => (
               <TabsTrigger key={f.value} value={f.value}>
                 {f.label}

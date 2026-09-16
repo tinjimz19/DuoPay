@@ -17,8 +17,7 @@ const CATEGORY_TABS = [
   { value: "OTRO", label: "Otro" },
 ] as const;
 
-const STATUS_TABS: { value: "all" | PreorderStatus; label: string }[] = [
-  { value: "all", label: "Todos" },
+const STATUS_TABS: { value: PreorderStatus; label: string }[] = [
   { value: "PENDENT", label: "Pend" },
   { value: "ORDERED", label: "Comp" },
   { value: "DELIVERED", label: "Entreg" },
@@ -33,13 +32,13 @@ export function PreorderList({
   clients: { id: string; name: string }[];
 }) {
   const [category, setCategory] = React.useState<string>("all");
-  const [status, setStatus] = React.useState<"all" | PreorderStatus>("all");
+  // Se abre en lo que falta por comprar, que es el trabajo del día.
+  const [status, setStatus] = React.useState<PreorderStatus>("PENDENT");
 
   const filtered = React.useMemo(() => {
     return preorders.filter((p) => {
       const matchesCategory = category === "all" || p.category === category;
-      const matchesStatus = status === "all" || p.status === status;
-      return matchesCategory && matchesStatus;
+      return matchesCategory && p.status === status;
     });
   }, [preorders, category, status]);
 
