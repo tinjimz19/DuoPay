@@ -32,11 +32,19 @@ export function ClientList({
   clients,
   businessName,
   paymentBlock,
+  rate,
 }: {
   clients: ClientWithBalance[];
   businessName?: string | null;
   /** Datos de cobro ya armados en el servidor, para el mensaje. */
   paymentBlock?: string[];
+  /**
+   * La tasa del BCV, traída una vez en el servidor.
+   *
+   * Baja desde la página y no la pide cada fila: una lista de cuarenta
+   * clientes serían cuarenta consultas para el mismo número.
+   */
+  rate?: number | null;
 }) {
   const [query, setQuery] = React.useState("");
 
@@ -109,6 +117,7 @@ export function ClientList({
                           businessName,
                           clientName: client.name,
                           total: client.balance,
+                          rate,
                           paymentBlock,
                         })
                       )}

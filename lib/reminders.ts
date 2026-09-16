@@ -47,16 +47,41 @@ export function buildTotalDebtReminderMessage(params: {
   businessName: string | null | undefined;
   clientName: string;
   total: number;
+  /**
+   * Bolívares por unidad. Sin tasa, el mensaje sale solo en referencia.
+   *
+   * Aquí hay una sola cifra, así que no hay nada que sumar: el bolívar se
+   * saca directo del total. En los otros mensajes, que llevan varias
+   * líneas, el total en bolívares se suma línea por línea para que cuadre
+   * con lo que el cliente suma a mano.
+   */
+  rate?: number | null;
   paymentBlock?: string[];
 }): string {
   const business = params.businessName?.trim() || "nuestra tienda";
 
-  return [
+  const rate = params.rate;
+  const hasRate = rate != null && Number.isFinite(rate) && rate > 0;
+
+  const saldo = hasRate
+    ? `${formatCurrency(params.total)} · ${formatBs(round2(params.total * rate))}`
+    : formatCurrency(params.total);
+
+  const lines = [
     `Hola ${params.clientName}, te saluda ${business}.`,
     "",
-    `Te recuerdo que tienes un saldo pendiente de ${formatCurrency(params.total)}.`,
-    ...cierre(params.paymentBlock, "Cuando puedas haznos el abono. ¡Gracias!"),
-  ].join("\n");
+    `Te recuerdo que tienes un saldo pendiente de ${saldo}.`,
+  ];
+
+  // De dónde salió el número en bolívares. Sin esto, el cliente que
+  // calcula con otra tasa cree que se le está cobrando de más.
+  if (hasRate) {
+    lines.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate)}`);
+  }
+
+  lines.push(...cierre(params.paymentBlock, "Cuando puedas haznos el abono. ¡Gracias!"));
+
+  return lines.join("\n");
 }
 
 export interface QuincenaItem {

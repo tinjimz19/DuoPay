@@ -1,3 +1,4 @@
+import { getEuroRate } from "@/actions/rates";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { ClientList } from "@/components/clients/client-list";
 import { paymentMethodsBlock } from "@/lib/payment-methods";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ClientesPage() {
   const supabase = createClient();
 
-  const [{ data: clients }, { data: sales }, { data: profile }, methods] =
+  const [{ data: clients }, { data: sales }, { data: profile }, methods, tasa] =
     await Promise.all([
       supabase
         .from("clients")
@@ -22,6 +23,7 @@ export default async function ClientesPage() {
         .is("deleted_at", null),
       supabase.from("profiles").select("business_name").maybeSingle(),
       activePaymentMethods(),
+      tasaParaMensajes(),
     ]);
 
   const balances = new Map<string, number>();
@@ -57,7 +59,23 @@ export default async function ClientesPage() {
         clients={enriched}
         businessName={profile?.business_name ?? null}
         paymentBlock={paymentMethodsBlock(methods)}
+        rate={tasa}
       />
     </div>
   );
+}
+
+/**
+ * La tasa del BCV para los mensajes, o null si no se pudo traer.
+ *
+ * Nunca lanza: un recordatorio sin bolívares se manda igual, y una lista de
+ * clientes que no carga porque la API del BCV está caída sería un mal
+ * negocio. Va cacheada 2 h por `getEuroRate`.
+ */
+async function tasaParaMensajes(): Promise<number | null> {
+  try {
+    return (await getEuroRate()).rate;
+  } catch {
+    return null;
+  }
 }
