@@ -74,24 +74,53 @@ export function buildQuincenaReminderMessage(params: {
   quincenaLabel: string;
   items: QuincenaItem[];
   behind: number;
+  /**
+   * Bolívares por dólar. Sin tasa, el mensaje sale solo en dólares.
+   *
+   * Va en bolívares además de en dólares porque es en bolívares que la
+   * persona hace el pago móvil. Obligarla a multiplicar es obligarla a
+   * equivocarse, y después la diferencia se discute en la puerta de su
+   * casa.
+   */
+  rate?: number | null;
   paymentBlock?: string[];
 }): string {
   const business = params.businessName?.trim() || "nuestra tienda";
   const total = params.items.reduce((sum, item) => sum + item.amount, 0);
   const uno = params.items.length === 1;
 
+  const rate = params.rate;
+  const hasRate = rate != null && Number.isFinite(rate) && rate > 0;
+  const inBs = (amount: number) => round2(amount * (rate as number));
+
   const lines = [
     `Hola ${params.clientName}, te saluda ${business}.`,
     "",
     `Llegó la quincena del ${params.quincenaLabel} y te toca:`,
     "",
-    ...params.items.map(
-      (item) => `- ${item.description}: ${formatCurrency(item.amount)}`
+    ...params.items.map((item) =>
+      hasRate
+        ? `- ${item.description}: ${formatCurrency(item.amount)} · ${formatBs(inBs(item.amount))}`
+        : `- ${item.description}: ${formatCurrency(item.amount)}`
     ),
   ];
 
   if (!uno) {
-    lines.push("", `Total: ${formatCurrency(total)}`);
+    /*
+      El total en bolívares es la SUMA DE LAS LÍNEAS, no el total en
+      dólares multiplicado por la tasa. Los dos caminos dan cifras
+      distintas por el redondeo, y quien recibe el mensaje suma las
+      líneas a mano: ese céntimo de diferencia es una discusión.
+    */
+    const totalBs = hasRate
+      ? round2(params.items.reduce((sum, item) => sum + inBs(item.amount), 0))
+      : 0;
+    lines.push(
+      "",
+      hasRate
+        ? `Total: ${formatCurrency(total)} · ${formatBs(totalBs)}`
+        : `Total: ${formatCurrency(total)}`
+    );
   }
 
   if (params.behind > 0) {
@@ -101,6 +130,12 @@ export function buildQuincenaReminderMessage(params: {
         ? "Ahí va incluida la quincena pasada que quedó pendiente."
         : `Ahí van incluidas ${params.behind} quincenas que quedaron pendientes.`
     );
+  }
+
+  // De dónde salió el número en bolívares. Sin esto, el cliente que
+  // calcula con otra tasa cree que se le está cobrando de más.
+  if (hasRate) {
+    lines.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate as number)}`);
   }
 
   lines.push(...cierre(params.paymentBlock, "Cuando puedas me avisas. ¡Gracias!"));

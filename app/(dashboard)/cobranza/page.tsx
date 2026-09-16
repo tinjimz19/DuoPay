@@ -1,5 +1,6 @@
 import { CalendarClock } from "lucide-react";
 
+import { getEuroRate } from "@/actions/rates";
 import { CobranzaList } from "@/components/cobranza/cobranza-list";
 import type {
   CobranzaClient,
@@ -37,7 +38,7 @@ interface SaleRow {
 export default async function CobranzaPage() {
   const supabase = createClient();
 
-  const [{ data: sales }, { data: profile }, methods] = await Promise.all([
+  const [{ data: sales }, { data: profile }, methods, tasa] = await Promise.all([
     supabase
       .from("sales")
       .select(
@@ -48,6 +49,7 @@ export default async function CobranzaPage() {
       .order("created_at", { ascending: true }),
     supabase.from("profiles").select("business_name").maybeSingle(),
     activePaymentMethods(),
+    tasaParaMensajes(),
   ]);
 
   const current = currentQuincena();
@@ -197,9 +199,26 @@ export default async function CobranzaPage() {
         tocaAhora={tocaAhora}
         alDia={alDia}
         businessName={profile?.business_name ?? null}
+        rate={tasa}
         quincenaLabel={quincenaLabel(current)}
         paymentBlock={paymentMethodsBlock(methods)}
       />
     </div>
   );
+}
+
+/**
+ * La tasa del BCV para los mensajes, o null si no se pudo traer.
+ *
+ * Nunca lanza: un recordatorio sin bolívares se manda igual, y una página
+ * de cobranza que no carga porque la API del BCV está caída sería un mal
+ * negocio. Va cacheada 2 h por `getEuroRate`, así que no es un viaje por
+ * cada visita.
+ */
+async function tasaParaMensajes(): Promise<number | null> {
+  try {
+    return (await getEuroRate()).rate;
+  } catch {
+    return null;
+  }
 }
