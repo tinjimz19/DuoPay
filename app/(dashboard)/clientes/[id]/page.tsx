@@ -117,7 +117,7 @@ export default async function ClienteDetailPage({
   /*
     Una línea por compra, con su CUOTA y no con el saldo entero.
 
-    Antes decía "falta USD 240" por cada venta. Es el mensaje equivocado
+    Antes decía "falta REF 240" por cada venta. Es el mensaje equivocado
     para cobrar: nadie paga 240 de golpe y la cifra grande desanima. Lo
     que se pide hoy es la cuota, y la decide `installmentFor`, que es la
     misma regla que usa el botón de cobrar de cada tarjeta.

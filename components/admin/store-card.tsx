@@ -155,7 +155,7 @@ export function StoreCard({ store }: { store: StoreWithStats }) {
           onClick={() => setRenewOpen(true)}
         >
           {pending && <Loader2 className="animate-spin" />}
-          {isActive ? "Renovar +30 días" : "Activar 30 días · $10"}
+          {isActive ? "Renovar +30 días" : "Activar 30 días · €10"}
         </Button>
 
         <DropdownMenu>
@@ -217,7 +217,7 @@ export function StoreCard({ store }: { store: StoreWithStats }) {
             <div className="flex items-center justify-between">
               <span className="text-slate-500 dark:text-slate-400">Cobro</span>
               <span className="font-semibold text-slate-900 dark:text-slate-100">
-                $10.00
+                €10,00
               </span>
             </div>
             <div className="flex items-center justify-between">

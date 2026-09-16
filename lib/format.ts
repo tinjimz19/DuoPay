@@ -6,9 +6,24 @@ export const MESES_CORTOS = [
   "jul", "ago", "sep", "oct", "nov", "dic",
 ] as const;
 
+/**
+ * El rótulo de los montos de la tienda.
+ *
+ * No dice USD porque no son dólares: son una REFERENCIA de precio que
+ * después se convierte a bolívares a la tasa del BCV. Llamarlo dólar
+ * confundía —el cliente comparaba con el dólar y le salía otra cifra—.
+ */
+const ROTULO = "REF";
+
+/*
+  `Intl` con `style: "currency"` necesita un código ISO de verdad, y
+  "REF" no lo es: pasárselo lanza RangeError. Por eso se formatea el
+  número solo y el rótulo se pone delante a mano. Los separadores siguen
+  siendo los de Venezuela: punto para los miles, coma para los decimales.
+*/
 const currencyFormatter = new Intl.NumberFormat("es-VE", {
-  style: "currency",
-  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 const bsFormatter = new Intl.NumberFormat("es-VE", {
@@ -19,7 +34,7 @@ const bsFormatter = new Intl.NumberFormat("es-VE", {
 });
 
 export function formatCurrency(value: number) {
-  return currencyFormatter.format(value);
+  return `${ROTULO} ${currencyFormatter.format(value)}`;
 }
 
 export function formatBs(value: number) {

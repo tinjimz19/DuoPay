@@ -208,7 +208,7 @@ export function PreorderConvertDialog({
                 name="totalAmount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Monto total ($)</FormLabel>
+                    <FormLabel>Monto total (€)</FormLabel>
                     <FormControl>
                       <MoneyInput
                         className="h-11"

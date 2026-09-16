@@ -141,7 +141,7 @@ export function ReportPaymentDialog({
         <DialogHeader>
           <DialogTitle>Reportar pago</DialogTitle>
           <DialogDescription>
-            Envía los datos de tu pago de $10/mes y lo verificamos en breve.
+            Envía los datos de tu pago de €10/mes y lo verificamos en breve.
           </DialogDescription>
         </DialogHeader>
 
@@ -165,7 +165,7 @@ export function ReportPaymentDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="report-amount">
-                Monto <span className="text-slate-400">(USD)</span>
+                Monto <span className="text-slate-400">(REF)</span>
               </Label>
               <MoneyInput
                 id="report-amount"

@@ -20,7 +20,7 @@ const REASONS: Record<ProfileStatus, { title: string; message: string }> = {
   ACTIVE: {
     title: "Suscripción vencida",
     message:
-      "Tu suscripción mensual expiró. Renueva por solo $10 al mes para recuperar el acceso.",
+      "Tu suscripción mensual expiró. Renueva por solo €10 al mes para recuperar el acceso.",
   },
   SUSPENDED: {
     title: "Cuenta suspendida",
@@ -30,7 +30,7 @@ const REASONS: Record<ProfileStatus, { title: string; message: string }> = {
   EXPIRED: {
     title: "Suscripción inactiva",
     message:
-      "Tu tienda no tiene una suscripción activa. Actívala por $10 al mes para continuar.",
+      "Tu tienda no tiene una suscripción activa. Actívala por €10 al mes para continuar.",
   },
 };
 
@@ -61,7 +61,7 @@ export default async function SuscripcionPage() {
   const whatsappNumber = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? "";
   const whatsappHref = whatsappNumber
     ? `https://wa.me/${normalizePhone(whatsappNumber)}?text=${encodeURIComponent(
-        "Hola, quiero activar mi suscripción de DuoPay ($10/mes)"
+        "Hola, quiero activar mi suscripción de DuoPay (€10/mes)"
       )}`
     : null;
 
@@ -82,7 +82,7 @@ export default async function SuscripcionPage() {
           Plan DuoPay
         </p>
         <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-slate-100">
-          $10<span className="text-sm font-medium text-slate-500 dark:text-slate-400">/mes</span>
+          €10<span className="text-sm font-medium text-slate-500 dark:text-slate-400">/mes</span>
         </p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Clientes, ventas a crédito, abonos y pedidos ilimitados

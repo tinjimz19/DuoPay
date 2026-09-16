@@ -1,7 +1,7 @@
 /**
  * Montos escritos a mano.
  *
- * Aquí la coma es el separador decimal — la app misma muestra "USD 1.234,50".
+ * Aquí la coma es el separador decimal — la app misma muestra "REF 1.234,50".
  * Pero los campos eran `<input type="number">`, y ese control DESCARTA todo lo
  * que el navegador considere inválido: con un teclado en español la coma entra
  * en esa categoría, así que `e.target.value` llegaba vacío. La coma no es que

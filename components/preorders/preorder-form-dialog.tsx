@@ -485,7 +485,7 @@ export function PreorderFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Precio est. ($){" "}
+                      Precio est. (€){" "}
                       <span className="text-slate-400">(opcional)</span>
                     </FormLabel>
                     <FormControl>

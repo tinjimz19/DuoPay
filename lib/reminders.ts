@@ -191,7 +191,7 @@ function round2(value: number): number {
  * Recordatorio de CUOTA, con su equivalente en bolívares.
  *
  * Reemplaza al de saldo total en los dos sitios donde se le escribe a un
- * cliente por sus compras. El motivo no es de forma: "debes USD 240" es el
+ * cliente por sus compras. El motivo no es de forma: "debes REF 240" es el
  * mensaje equivocado para cobrar —nadie paga 240 de golpe, y la cifra
  * grande desanima en vez de cobrar—. Lo que se pide hoy es la cuota.
  *
