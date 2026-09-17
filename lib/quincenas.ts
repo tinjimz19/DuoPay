@@ -190,6 +190,8 @@ export interface CobranzaSchedule {
   dueNow: number;
   /** Índice de la quincena del primer cobro. */
   firstQuincena: number;
+  /** Saldo total que resta de la venta. */
+  remaining: number;
   /**
    * El día exacto de cobro, cuando la venta es de una sola cuota.
    *
