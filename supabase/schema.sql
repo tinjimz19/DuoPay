@@ -525,14 +525,23 @@ CREATE INDEX IF NOT EXISTS idx_payments_sale_active
 -- los deriva la app (lib/quincenas.ts).
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS first_charge_date DATE;
 
-DO $$ BEGIN
-  ALTER TABLE public.sales
-    ADD CONSTRAINT sales_first_charge_date_check
-    CHECK (
-      first_charge_date IS NULL
-      OR EXTRACT(DAY FROM first_charge_date) IN (1, 15)
-    );
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- La fecha de primer cobro cae en una quincena (el 1 o el 15)... salvo el
+-- pago único, que la tienda pacta para un día concreto ("me paga el 25").
+-- Con una sola cuota no hay calendario de quincenas que respetar, así que ahí
+-- se permite cualquier día.
+--
+-- DROP + ADD (idempotente) en vez del bloque con EXCEPTION de antes: si la
+-- base ya tiene la versión vieja de esta regla, hay que reemplazarla, y
+-- "duplicate_object" la habría dejado intacta.
+ALTER TABLE public.sales
+  DROP CONSTRAINT IF EXISTS sales_first_charge_date_check;
+ALTER TABLE public.sales
+  ADD CONSTRAINT sales_first_charge_date_check
+  CHECK (
+    first_charge_date IS NULL
+    OR EXTRACT(DAY FROM first_charge_date) IN (1, 15)
+    OR installments_count = 1
+  );
 
 ALTER TABLE public.sales
   ALTER COLUMN first_charge_date SET DEFAULT (
