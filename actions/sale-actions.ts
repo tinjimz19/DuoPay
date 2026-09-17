@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { formatCurrency } from "@/lib/format";
+import { caracasDateStr, formatCurrency } from "@/lib/format";
 import { chargeDateIso, currentQuincena } from "@/lib/quincenas";
 import { ensureClient } from "@/lib/clients-server";
 import {
@@ -14,6 +14,7 @@ import {
   zodMessage,
   type ActionResult,
 } from "@/lib/validation";
+import type { SaleStatus } from "@/types/database.types";
 
 /*
  * La categoría ya no es una lista fija: la administra el super admin. Se
@@ -28,6 +29,52 @@ const categorySchema = z
 /** Los montos viven como NUMERIC(10,2): nada de centésimas fantasma. */
 function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * ¿Una fecha de cobro escrita a mano es creíble?
+ *
+ * El rango no es burocracia: sin él, un dedazo como 2206 en vez de 2026 deja
+ * una venta que nadie va a cobrar nunca y que además no molesta a nadie,
+ * porque queda eternamente "por empezar" y no aparece en cobranza.
+ */
+function fechaRazonable(iso: string): boolean {
+  const dia = Date.parse(`${iso}T12:00:00-04:00`);
+  const hoy = Date.parse(`${caracasDateStr()}T12:00:00-04:00`);
+  if (!Number.isFinite(dia)) return false;
+  const dias = (dia - hoy) / 86_400_000;
+  return dias >= -366 && dias <= 366;
+}
+
+/** La fecha suelta de un pago único. Opcional: casi ninguna venta la usa. */
+const fechaDeCobroSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida")
+  .refine(fechaRazonable, "Esa fecha está demasiado lejos")
+  .optional()
+  .nullable();
+
+/**
+ * Qué fecha de primer cobro se guarda.
+ *
+ * Por defecto se calcula del desplazamiento de quincenas: viaja el número
+ * —0 = esta, 1 = la próxima— y no la fecha, así no puede llegar una fecha
+ * inventada desde el navegador.
+ *
+ * La excepción es el pago único. Ahí la tienda pacta un día concreto ("me
+ * paga el 25") que no existe en el calendario de quincenas, y ese día sí
+ * viaja tal cual. Con dos o más cuotas la fecha suelta se ignora aunque
+ * llegue: habría que inventar cuándo caen las siguientes.
+ */
+function fechaDePrimerCobro(params: {
+  installmentsCount: number;
+  firstChargeOffset: number;
+  firstChargeDate?: string | null;
+}): string {
+  if (params.installmentsCount === 1 && params.firstChargeDate) {
+    return params.firstChargeDate;
+  }
+  return chargeDateIso(currentQuincena() + params.firstChargeOffset);
 }
 
 function revalidateSaleViews(clientId?: string | null) {
@@ -69,6 +116,8 @@ const createSaleSchema = z.object({
     .min(0, "Primer cobro inválido")
     .max(5, "Primer cobro demasiado lejos")
     .default(1),
+  // Y la excepción: el que paga todo de una vez un día concreto.
+  firstChargeDate: fechaDeCobroSchema,
   // Qué salió del inventario. Vacío = venta suelta que no mueve stock.
   items: z
     .array(
@@ -164,9 +213,7 @@ export async function createSale(
       category: values.category,
       total_amount: round2(values.totalAmount),
       installments_count: values.installmentsCount,
-      first_charge_date: chargeDateIso(
-        currentQuincena() + values.firstChargeOffset
-      ),
+      first_charge_date: fechaDePrimerCobro(values),
       notes: values.notes?.trim() || null,
     })
     .select("id")
@@ -827,5 +874,156 @@ export async function purgeSale(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/papelera");
+  return { success: true };
+}
+
+
+/**
+ * Qué se puede editar de una venta ya registrada.
+ *
+ * NO va el cliente. Mover una venta de una persona a otra arrastra también
+ * sus abonos, y deja dos historiales mintiendo: uno que cobró algo que no
+ * vendió y otro que debe algo que nunca compró. Si de verdad se registró al
+ * cliente equivocado, lo correcto es anular la venta y rehacerla.
+ *
+ * Tampoco van los productos del inventario: el stock ya se movió cuando se
+ * registró la venta, y deshacerlo bien es otra funcionalidad.
+ */
+const updateSaleSchema = z.object({
+  id: z.string().uuid(),
+  itemDescription: z
+    .string()
+    .min(3, "Describe la mercancía")
+    .max(300, "Descripción muy larga"),
+  category: categorySchema,
+  totalAmount: z.coerce
+    .number({ message: "Monto inválido" })
+    .positive("El monto debe ser mayor a 0"),
+  installmentsCount: z.coerce
+    .number({ message: "Cuotas inválidas" })
+    .int("Las cuotas deben ser un número entero")
+    .min(1, "Al menos 1 cuota")
+    .max(36, "Máximo 36 cuotas"),
+  firstChargeOffset: z.coerce
+    .number({ message: "Primer cobro inválido" })
+    .int()
+    .min(0, "Primer cobro inválido")
+    .max(5, "Primer cobro demasiado lejos")
+    .default(1),
+  firstChargeDate: fechaDeCobroSchema,
+  notes: z.string().max(500).optional().nullable(),
+  /**
+   * La tienda ya vio el aviso de que el monto nuevo queda por debajo de lo
+   * abonado y aun así quiere guardar.
+   */
+  confirmarSaldoAFavor: z.boolean().optional().default(false),
+});
+
+export type UpdateSaleInput = z.infer<typeof updateSaleSchema>;
+
+export type UpdateSaleResult =
+  | { success: true }
+  | {
+      success: false;
+      error: string;
+      /** El monto nuevo no alcanza lo ya abonado: hace falta confirmar. */
+      needsConfirm?: boolean;
+      /** Cuánto le quedaría a favor al cliente si se guarda así. */
+      aFavor?: number;
+    };
+
+/**
+ * Edita una venta ya registrada.
+ *
+ * EL AVISO DEL SALDO A FAVOR
+ *
+ * Bajarle el monto a una venta que ya tiene abonos puede dejar al cliente
+ * habiendo pagado de más. No se impide —a veces el monto se registró mal y
+ * corregirlo es justo lo que hay que hacer— pero no se hace en silencio: la
+ * primera llamada devuelve `needsConfirm` con la cifra exacta que quedaría a
+ * favor, y solo la segunda, ya confirmada, guarda.
+ *
+ * Los abonos NUNCA se tocan. Lo que cambia es la venta; lo que el cliente
+ * puso sigue registrado tal cual, que es el dato que no se puede perder.
+ */
+export async function updateSale(input: UpdateSaleInput): Promise<UpdateSaleResult> {
+  const parsed = updateSaleSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: zodMessage(parsed.error) };
+  }
+  const values = parsed.data;
+
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const { data: venta, error: buscarError } = await supabase
+    .from("sales")
+    .select("id, client_id, amount_paid")
+    .eq("id", values.id)
+    .eq("user_id", user.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (buscarError) {
+    return { success: false, error: dbErrorMessage(buscarError.message) };
+  }
+  if (!venta) {
+    return { success: false, error: "Esa venta ya no existe" };
+  }
+
+  const total = round2(values.totalAmount);
+  const abonado = round2(Number(venta.amount_paid));
+
+  if (total < abonado && !values.confirmarSaldoAFavor) {
+    return {
+      success: false,
+      needsConfirm: true,
+      aFavor: round2(abonado - total),
+      error:
+        `Este cliente ya abonó ${abonado} y el monto nuevo es ${total}. ` +
+        `Quedaría a favor ${round2(abonado - total)}.`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("sales")
+    .update({
+      item_description: values.itemDescription.trim(),
+      category: values.category,
+      total_amount: total,
+      installments_count: values.installmentsCount,
+      first_charge_date: fechaDePrimerCobro(values),
+      notes: values.notes?.trim() || null,
+    })
+    .eq("id", values.id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: dbErrorMessage(error.message) };
+  }
+
+  /*
+    `status` y `amount_paid` no se tocan aquí: los mantiene la base cuando
+    entra o sale un abono. Pero al cambiar el total, el estado guardado puede
+    quedar viejo —una venta que era PARTIAL y ahora está saldada, o al revés—,
+    así que se recalcula con la misma regla de siempre.
+  */
+  const nuevoEstado: SaleStatus =
+    abonado >= total ? "COMPLETED" : abonado > 0 ? "PARTIAL" : "PENDING";
+
+  await supabase
+    .from("sales")
+    .update({ status: nuevoEstado })
+    .eq("id", values.id)
+    .eq("user_id", user.id);
+
+  revalidateSaleViews(venta.client_id);
   return { success: true };
 }

@@ -6,7 +6,11 @@
  * No tocan la base de datos: son puro cálculo. Si algo se rompe, lanza.
  */
 import {
+  FIRST_CHARGE_CHOICES,
   chargeDateIso,
+  esPagoUnicoEnFecha,
+  fechaCorta,
+  inicioLabel,
   cobranzaBadgeLabel,
   currentQuincena,
   daysUntilCharge,
@@ -17,7 +21,7 @@ import {
   quincenaLabelForDate,
   saleSchedule,
   type SaleForSchedule,
-} from "@/lib/quincenas";
+} from "./quincenas";
 
 let fails = 0;
 function eq(label: string, got: unknown, want: unknown) {
@@ -146,6 +150,85 @@ eq("fechas el 20 de dic", fechasFC("2026-12-20"), ["2026-12-15", "2027-01-01", "
 
 console.log("\n--- febrero ---");
 eq("opciones el 20 de feb 2027", resumenFC("2027-02-20"), ["15 de feb (ya)", "1 de mar (9d)", "15 de mar (23d)"]);
+
+
+console.log("\n--- PAGO ÚNICO EN FECHA EXACTA ---");
+// El cliente que paga todo de una vez y dice "el 25".
+const unico = (paid: number, dia: string, total = 100) => ({
+  total_amount: total, amount_paid: paid, installment_amount: total,
+  installments_count: 1, first_charge_date: dia,
+});
+
+eq("una cuota con fecha ES pago único", esPagoUnicoEnFecha(unico(0, "2026-09-25")), true);
+eq("dos cuotas NO lo son",
+   esPagoUnicoEnFecha({ total_amount: 100, amount_paid: 0, installment_amount: 50,
+                        installments_count: 2, first_charge_date: "2026-09-15" }), false);
+eq("una cuota sin fecha tampoco",
+   esPagoUnicoEnFecha({ total_amount: 100, amount_paid: 0, installment_amount: 100,
+                        installments_count: 1, first_charge_date: null }), false);
+
+s = saleSchedule(unico(0, "2026-09-25"), at("2026-09-20"));
+eq("antes del día: por empezar", [s.state, s.dueNow, s.fechaFija],
+   ["POR_EMPEZAR", 0, "2026-09-25"]);
+eq("y lo dice con SU fecha, no con la quincena",
+   cobranzaBadgeLabel(s), "Empieza el 25 de sep");
+
+s = saleSchedule(unico(0, "2026-09-25"), at("2026-09-25"));
+eq("el mismo día: toca todo", [s.state, s.dueNow, s.behind], ["TOCA_AHORA", 100, 0]);
+eq("etiqueta el mismo día", cobranzaBadgeLabel(s), "Toca ahora");
+
+s = saleSchedule(unico(0, "2026-09-25"), at("2026-09-28"));
+eq("tres días después sigue tocando", [s.state, s.behind], ["TOCA_AHORA", 0]);
+
+s = saleSchedule(unico(0, "2026-09-25"), at("2026-10-03"));
+eq("pasó la jornada siguiente: vencido", [s.state, s.behind, s.dueNow],
+   ["ATRASADO", 1, 100]);
+eq("y lo dice por su fecha", cobranzaBadgeLabel(s), "Venció el 25 de sep");
+
+s = saleSchedule(unico(100, "2026-09-25"), at("2026-10-03"));
+eq("pagado queda saldado", [s.state, s.dueNow], ["SALDADO", 0]);
+s = saleSchedule(unico(40, "2026-09-25"), at("2026-09-28"));
+eq("abono parcial: queda debiendo el resto", [s.state, s.dueNow], ["TOCA_AHORA", 60]);
+
+// El día 1ero, que es el otro caso que mencionó la tienda.
+s = saleSchedule(unico(0, "2026-10-01"), at("2026-09-28"));
+eq("pago único el 1ero, antes", [s.state, s.dueNow], ["POR_EMPEZAR", 0]);
+s = saleSchedule(unico(0, "2026-10-01"), at("2026-10-01"));
+eq("pago único el 1ero, llegado", [s.state, s.dueNow], ["TOCA_AHORA", 100]);
+
+console.log("\n--- las ventas de UNA cuota que ya existían no cambian ---");
+// Medir por día y medir por quincena dan el mismo resultado cuando la
+// fecha es un 1 o un 15. Esto es lo que permite no agregar una columna.
+s = saleSchedule(unico(0, "2026-08-15"), at("2026-08-14"));
+eq("15 ago, un día antes: no empieza", s.state, "POR_EMPEZAR");
+s = saleSchedule(unico(0, "2026-08-15"), at("2026-08-15"));
+eq("15 ago, el día: toca", [s.state, s.dueNow], ["TOCA_AHORA", 100]);
+s = saleSchedule(unico(0, "2026-08-15"), at("2026-08-22"));
+eq("15 ago, una semana después: sigue tocando", [s.state, s.behind], ["TOCA_AHORA", 0]);
+s = saleSchedule(unico(0, "2026-08-15"), at("2026-09-05"));
+eq("15 ago, en la jornada siguiente: atrasado", [s.state, s.behind], ["ATRASADO", 1]);
+
+console.log("\n--- las ventas por quincenas siguen sin fecha fija ---");
+s = saleSchedule(venta(0, "2026-08-15"), at("2026-08-22"));
+eq("una venta de 2 cuotas no trae fechaFija", s.fechaFija, null);
+eq("y su inicio se dice por quincena",
+   inicioLabel(saleSchedule(venta(0, "2026-09-01"), at("2026-08-22"))), "1 de sep");
+eq("el de un pago único, por su día",
+   inicioLabel(saleSchedule(unico(0, "2026-09-25"), at("2026-09-20"))), "25 de sep");
+
+console.log("\n--- fechaCorta ---");
+eq("25 de septiembre", fechaCorta("2026-09-25"), "25 de sep");
+eq("1 de enero", fechaCorta("2027-01-01"), "1 de ene");
+eq("aguanta una marca de tiempo entera", fechaCorta("2026-12-03T10:00:00-04:00"), "3 de dic");
+
+console.log("\n--- ahora se ofrecen CUATRO jornadas ---");
+eq("la constante", FIRST_CHARGE_CHOICES, 4);
+eq("cuatro opciones desde el 20 de ago",
+   firstChargeOptions(FIRST_CHARGE_CHOICES, at("2026-08-20")).map((o) => o.label),
+   ["15 de ago", "1 de sep", "15 de sep", "1 de oct"]);
+eq("cruza el fin de año",
+   firstChargeOptions(FIRST_CHARGE_CHOICES, at("2026-12-20")).map((o) => o.label),
+   ["15 de dic", "1 de ene", "15 de ene", "1 de feb"]);
 
 
 console.log(fails === 0 ? "\n=== TODO PASÓ ===" : `\n=== ${fails} FALLOS ===`);

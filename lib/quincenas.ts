@@ -1,4 +1,4 @@
-import { caracasDateStr, MESES_CORTOS } from "@/lib/format";
+import { caracasDateStr, MESES_CORTOS } from "./format";
 
 /**
  * En Venezuela la gente cobra sueldo el 15 y el 1ero, así que la cobranza no
@@ -91,6 +91,12 @@ export function quincenaFromChargeDate(iso: string): number {
   return quincenaIndex(year, month, 0);
 }
 
+/** "25 de sep", a partir de una fecha ISO. Para los pagos únicos. */
+export function fechaCorta(iso: string): string {
+  const [, month, day] = iso.slice(0, 10).split("-").map(Number);
+  return `${day} de ${MESES_CORTOS[month - 1]}`;
+}
+
 /** "15 de ago" · "1 de sep" */
 export function quincenaLabel(index: number): string {
   const { month, day } = chargeDateOf(index);
@@ -120,7 +126,7 @@ export function daysUntilCharge(index: number, now: Date = new Date()): number {
 }
 
 /** Cuántas jornadas de cobro se ofrecen al registrar una venta. */
-export const FIRST_CHARGE_CHOICES = 3;
+export const FIRST_CHARGE_CHOICES = 4;
 
 export interface FirstChargeOption {
   /** Quincenas por delante de la vigente: 0 = esta, 1 = la próxima… */
@@ -184,8 +190,25 @@ export interface CobranzaSchedule {
   dueNow: number;
   /** Índice de la quincena del primer cobro. */
   firstQuincena: number;
-  /** Saldo total que resta de la venta. */
-  remaining: number;
+  /**
+   * El día exacto de cobro, cuando la venta es de una sola cuota.
+   *
+   * Null en las ventas por quincenas, que son la mayoría. Cuando viene
+   * lleno, manda sobre `firstQuincena` para todo lo que se le muestre a
+   * la tienda: una venta que vence el 25 no puede decir "15 de sep".
+   */
+  fechaFija: string | null;
+}
+
+/**
+ * ¿Esta venta se cobra en un día exacto en vez de por quincenas?
+ *
+ * Es el caso del cliente que paga todo de una vez y dice "el 25". Se
+ * reconoce por tener una sola cuota: con dos o más, la fecha suelta no se
+ * ofrece.
+ */
+export function esPagoUnicoEnFecha(sale: SaleForSchedule): boolean {
+  return Number(sale.installments_count) === 1 && Boolean(sale.first_charge_date);
 }
 
 function round2(value: number): number {
@@ -214,11 +237,47 @@ export function saleSchedule(
     behind: 0,
     dueNow: 0,
     firstQuincena,
+    fechaFija: null,
     remaining,
   };
 
   if (remaining <= 0) {
     return { ...base, state: "SALDADO" };
+  }
+
+  /*
+    PAGO ÚNICO: se mide contra el día, no contra la quincena.
+
+    El calendario de quincenas solo tiene el 1 y el 15, así que un cobro
+    pactado para el 25 no existe en él. Una venta de una sola cuota se
+    compara directamente con su fecha guardada.
+
+    Esto NO cambia las ventas de una cuota que ya existían: cuando la
+    fecha es un 1 o un 15, medir por día y medir por quincena dan el mismo
+    resultado, porque la quincena se cobra justo ese día.
+  */
+  if (count === 1 && sale.first_charge_date) {
+    const dia = sale.first_charge_date.slice(0, 10);
+    const fijo = { ...base, fechaFija: dia };
+
+    if (caracasDateStr(now) < dia) {
+      return { ...fijo, state: "POR_EMPEZAR" };
+    }
+
+    // Ya llegó el día: se debe todo lo que falte. El "atraso" se cuenta en
+    // jornadas de cobro para que la tienda lo lea con la misma vara que el
+    // resto, aunque esta venta no vaya por quincenas.
+    const vencidas = Math.max(
+      0,
+      currentQuincena(now) - currentQuincena(new Date(`${dia}T12:00:00-04:00`))
+    );
+    return {
+      ...fijo,
+      state: vencidas > 0 ? "ATRASADO" : "TOCA_AHORA",
+      due: 1,
+      behind: vencidas,
+      dueNow: remaining,
+    };
   }
 
   const current = currentQuincena(now);
@@ -256,6 +315,9 @@ export function saleSchedule(
     behind,
     dueNow,
     firstQuincena,
+    // Por quincenas no hay día fijo: el calendario lo pone la tienda, no
+    // esta venta.
+    fechaFija: null,
     remaining,
   };
 }
@@ -268,15 +330,27 @@ export const COBRANZA_STATE_LABELS: Record<CobranzaState, string> = {
   SALDADO: "Saldado",
 };
 
+/** Cuándo arranca a cobrarse: la fecha exacta si la hay, si no la quincena. */
+export function inicioLabel(schedule: CobranzaSchedule): string {
+  return schedule.fechaFija
+    ? fechaCorta(schedule.fechaFija)
+    : quincenaLabel(schedule.firstQuincena);
+}
+
 /** "Atrasado 2 quincenas" · "Toca esta quincena" · "Empieza el 1 de sep" */
 export function cobranzaBadgeLabel(schedule: CobranzaSchedule): string {
   switch (schedule.state) {
     case "ATRASADO":
-      return `Atrasado ${schedule.behind} quincena${schedule.behind === 1 ? "" : "s"}`;
+      // Un pago único no se atrasa "en quincenas": venció un día concreto,
+      // y decirlo por su fecha es lo que la tienda le va a repetir al
+      // cliente.
+      return schedule.fechaFija
+        ? `Venció el ${fechaCorta(schedule.fechaFija)}`
+        : `Atrasado ${schedule.behind} quincena${schedule.behind === 1 ? "" : "s"}`;
     case "TOCA_AHORA":
-      return "Toca esta quincena";
+      return schedule.fechaFija ? "Toca ahora" : "Toca esta quincena";
     case "POR_EMPEZAR":
-      return `Empieza el ${quincenaLabel(schedule.firstQuincena)}`;
+      return `Empieza el ${inicioLabel(schedule)}`;
     case "SALDADO":
       return "Saldado";
     default:

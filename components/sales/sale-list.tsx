@@ -5,6 +5,7 @@ import * as React from "react";
 
 import { Paginacion, usePagination } from "@/components/pagination";
 import { SaleCard, type SaleCardData } from "@/components/sales/sale-card";
+import type { FirstChargeOption } from "@/lib/quincenas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,7 @@ export function SaleList({
   businessName,
   paymentBlock,
   rate,
+  firstChargeOptions,
 }: {
   sales: SaleCardData[];
   businessName?: string | null;
@@ -27,6 +29,8 @@ export function SaleList({
   rate?: number | null;
   /** Datos de cobro ya armados en el servidor, para el mensaje. */
   paymentBlock?: string[];
+  /** Las jornadas que ofrece el diálogo de editar. */
+  firstChargeOptions?: FirstChargeOption[];
 }) {
   // Se abre en pendientes: lo saldado ya no pide nada.
   const [filter, setFilter] =
@@ -89,6 +93,7 @@ export function SaleList({
               businessName={businessName}
               rate={rate}
               paymentBlock={paymentBlock}
+              firstChargeOptions={firstChargeOptions}
             />
           ))}
         </div>

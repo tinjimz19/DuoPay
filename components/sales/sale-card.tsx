@@ -10,6 +10,8 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { SaleEditDialog } from "@/components/sales/sale-edit-dialog";
+import type { FirstChargeOption } from "@/lib/quincenas";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -74,6 +76,8 @@ export interface SaleCardData {
   status: SaleStatus;
   notes: string | null;
   created_at: string;
+  /** Desde cuándo se cobra. La necesita el diálogo de editar. */
+  first_charge_date?: string | null;
   client_name: string;
   client_phone?: string | null;
   payments?: PaymentRecord[];
@@ -251,6 +255,7 @@ export function SaleCard({
   businessName,
   paymentBlock,
   rate,
+  firstChargeOptions,
   showClient = true,
 }: {
   sale: SaleCardData;
@@ -266,6 +271,14 @@ export function SaleCard({
    * lista. Baja una vez, desde la página.
    */
   rate?: number | null;
+  /**
+   * Las jornadas de cobro que puede elegir el diálogo de editar.
+   *
+   * Bajan de la página, igual que la tasa: si cada tarjeta las calculara,
+   * el reloj del navegador y el del servidor discreparían y React se
+   * quejaría de la hidratación.
+   */
+  firstChargeOptions?: FirstChargeOption[];
   /** En la ficha de un cliente sobra repetir su nombre en cada venta. */
   showClient?: boolean;
 }) {
@@ -273,6 +286,7 @@ export function SaleCard({
   const [open, setOpen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [customAmount, setCustomAmount] = React.useState("");
   const [notes, setNotes] = React.useState("");
@@ -574,6 +588,20 @@ export function SaleCard({
                 </a>
               </DropdownMenuItem>
             )}
+            {firstChargeOptions && (
+              <DropdownMenuItem
+                // Igual que eliminar: Radix cierra el menú al elegir, así
+                // que lo cerramos y abrimos el diálogo a mano.
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setMenuOpen(false);
+                  setEditOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+                Editar venta
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
               disabled={pending}
@@ -589,6 +617,27 @@ export function SaleCard({
               Eliminar venta
             </DropdownMenuItem>
           </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {firstChargeOptions && (
+        <SaleEditDialog
+          sale={{
+            id: sale.id,
+            item_description: sale.item_description,
+            category: sale.category,
+            total_amount: Number(sale.total_amount),
+            installments_count: sale.installments_count,
+            amount_paid: Number(sale.amount_paid),
+            first_charge_date: sale.first_charge_date ?? null,
+            notes: sale.notes,
+          }}
+          firstChargeOptions={firstChargeOptions}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
+
         </DropdownMenu>
       </div>
 

@@ -11,6 +11,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   currentQuincena,
   daysUntilCharge,
+  inicioLabel,
   nextQuincena,
   quincenaLabel,
   quincenaLongLabel,
@@ -89,10 +90,11 @@ export default async function CobranzaPage() {
       behind: schedule.behind,
       state: schedule.state,
       installmentLabel: `Cuota ${Math.min(schedule.due, raw.installments_count) || 1} de ${raw.installments_count}`,
+      // `inicioLabel` y no `quincenaLabel`: una venta de pago único vence
+     // un día exacto —el 25, por ejemplo— y decir "15 de sep" sería
+     // mandar a la tienda a cobrar el día equivocado.
       startsLabel:
-        schedule.state === "POR_EMPEZAR"
-          ? quincenaLabel(schedule.firstQuincena)
-          : null,
+        schedule.state === "POR_EMPEZAR" ? inicioLabel(schedule) : null,
     };
 
     const entry = byClient.get(client.id);

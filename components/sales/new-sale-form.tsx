@@ -15,6 +15,10 @@ import {
   type ClientSelection,
 } from "@/components/clients/client-picker";
 import {
+  PrimerCobroField,
+  type PrimerCobroValue,
+} from "@/components/sales/primer-cobro-field";
+import {
   SaleItemsField,
   type SaleItemDraft,
   type StockProduct,
@@ -57,7 +61,6 @@ const saleSchema = z.object({
       (v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 36,
       "Entre 1 y 36 cuotas"
     ),
-  firstChargeOffset: z.number().int().min(0),
   notes: z.string().optional(),
 });
 
@@ -79,6 +82,16 @@ export function NewSaleForm({
   const [client, setClient] = React.useState<ClientSelection>({ kind: "none" });
   const [showClientError, setShowClientError] = React.useState(false);
   const [items, setItems] = React.useState<SaleItemDraft[]>([]);
+  /*
+    Desde cuándo se cobra. Vive fuera del formulario porque son dos datos
+    que viajan juntos y uno anula al otro: o una quincena, o un día suelto.
+    Meterlos como dos campos sueltos de react-hook-form deja estados
+    imposibles —quincena Y fecha a la vez— que después hay que desenredar.
+  */
+  const [primerCobro, setPrimerCobro] = React.useState<PrimerCobroValue>({
+    offset: 1,
+    fecha: null,
+  });
   // Mientras no escriba nada a mano, la descripción y la categoría se
   // arman solas con lo que elija del inventario.
   const [descTouched, setDescTouched] = React.useState(false);
@@ -121,7 +134,6 @@ export function NewSaleForm({
       category: categorias.selectable[0]?.slug ?? "OTRO",
       totalAmount: "",
       installmentsCount: "2",
-      firstChargeOffset: 1,
       notes: "",
     },
   });
@@ -152,6 +164,11 @@ export function NewSaleForm({
           : null,
       totalAmount: parseMoney(values.totalAmount),
       installmentsCount: Number(values.installmentsCount),
+      firstChargeOffset: primerCobro.offset,
+      // La fecha suelta solo vale con una cuota; el servidor la ignora
+      // igual, pero no mandarla evita que quede guardada por accidente.
+      firstChargeDate:
+        Number(values.installmentsCount) === 1 ? primerCobro.fecha : null,
       items,
     });
     setLoading(false);
@@ -293,42 +310,11 @@ export function NewSaleForm({
           </div>
         )}
 
-        <FormField
-          control={form.control}
-          name="firstChargeOffset"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Primer cobro</FormLabel>
-              <div className="grid grid-cols-3 gap-2">
-                {firstChargeOptions.map((option) => {
-                  const active = field.value === option.offset;
-                  return (
-                    <button
-                      key={option.offset}
-                      type="button"
-                      onClick={() => field.onChange(option.offset)}
-                      aria-pressed={active}
-                      className={
-                        active
-                          ? "rounded-lg border-2 border-indigo-500 bg-indigo-50 px-2 py-2.5 text-center dark:bg-indigo-950/40"
-                          : "rounded-lg border border-slate-200 px-2 py-2.5 text-center hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-                      }
-                    >
-                      <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {option.label}
-                      </span>
-                      <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
-                        {option.daysAway === 0
-                          ? "cobras ya"
-                          : `en ${option.daysAway} día${option.daysAway === 1 ? "" : "s"}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
+        <PrimerCobroField
+          options={firstChargeOptions}
+          value={primerCobro}
+          onChange={setPrimerCobro}
+          permiteFechaSuelta={Number(form.watch("installmentsCount")) === 1}
         />
 
         <FormField

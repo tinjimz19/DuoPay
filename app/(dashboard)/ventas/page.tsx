@@ -7,6 +7,7 @@ import { SaleList } from "@/components/sales/sale-list";
 import { Button } from "@/components/ui/button";
 import {
   cobranzaBadgeLabel,
+  firstChargeOptions,
   saleSchedule,
 } from "@/lib/quincenas";
 import { paymentMethodsBlock } from "@/lib/payment-methods";
@@ -57,6 +58,7 @@ export default async function VentasPage() {
     status: s.status,
     notes: s.notes,
     created_at: s.created_at,
+    first_charge_date: s.first_charge_date,
     client_name:
       (s.clients as unknown as { name: string } | null)?.name ?? "Cliente",
     client_phone:
@@ -103,6 +105,7 @@ export default async function VentasPage() {
         businessName={profile?.business_name ?? null}
         paymentBlock={paymentMethodsBlock(methods)}
         rate={tasa}
+        firstChargeOptions={firstChargeOptions()}
       />
     </div>
   );
