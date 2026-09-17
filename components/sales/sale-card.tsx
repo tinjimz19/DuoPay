@@ -638,9 +638,6 @@ export function SaleCard({
         />
       )}
 
-        </DropdownMenu>
-      </div>
-
       <ConfirmDialog
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
