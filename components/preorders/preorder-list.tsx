@@ -5,6 +5,7 @@ import * as React from "react";
 
 import { Paginacion, usePagination } from "@/components/pagination";
 import { PreorderCard, type PreorderCardData } from "@/components/preorders/preorder-card";
+import { PreorderExportButton } from "@/components/preorders/preorder-export-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PreorderStatus } from "@/types/database.types";
@@ -48,6 +49,9 @@ export function PreorderList({
   return (
     <div className="scroll-mt-24 space-y-4" ref={pagina.topRef}>
       <div className="space-y-3">
+        <div className="flex items-center justify-end">
+          <PreorderExportButton preorders={preorders} />
+        </div>
         <Tabs value={category} onValueChange={setCategory}>
           <TabsList className="w-full">
             {CATEGORY_TABS.map((t) => (
