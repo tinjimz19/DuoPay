@@ -76,7 +76,7 @@ export function buildTotalDebtReminderMessage(params: {
   // De dónde salió el número en bolívares. Sin esto, el cliente que
   // calcula con otra tasa cree que se le está cobrando de más.
   if (hasRate) {
-    lines.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate)}`);
+    lines.push("", `Calculado a la tasa EURO (BCV) de hoy: ${formatBs(rate)}`);
   }
 
   lines.push(...cierre(params.paymentBlock, "Cuando puedas haznos el abono. ¡Gracias!"));
@@ -160,7 +160,7 @@ export function buildQuincenaReminderMessage(params: {
   // De dónde salió el número en bolívares. Sin esto, el cliente que
   // calcula con otra tasa cree que se le está cobrando de más.
   if (hasRate) {
-    lines.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate as number)}`);
+    lines.push("", `Calculado a la tasa EURO (BCV) de hoy: ${formatBs(rate as number)}`);
   }
 
   lines.push(...cierre(params.paymentBlock, "Cuando puedas me avisas. ¡Gracias!"));
@@ -287,7 +287,7 @@ export function buildInstallmentReminderMessage(params: {
   // De dónde salió el número en bolívares. Sin esto, el cliente que
   // calcula con otra tasa cree que se le está cobrando de más.
   if (hasRate) {
-    out.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate as number)}`);
+    out.push("", `Calculado a la tasa EURO (BCV) de hoy: ${formatBs(rate as number)}`);
   }
 
   out.push(...cierre(params.paymentBlock, "Cuando puedas haznos el abono. ¡Gracias!"));
@@ -343,7 +343,7 @@ export function buildPaymentReceiptMessage(params: {
 
   // De dónde salió el número en bolívares, igual que en los recordatorios.
   if (hasRate) {
-    out.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate as number)}`);
+    out.push("", `Calculado a la tasa EURO (BCV) de hoy: ${formatBs(rate as number)}`);
   }
 
   out.push(
