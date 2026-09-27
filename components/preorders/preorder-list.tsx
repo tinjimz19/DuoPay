@@ -11,9 +11,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PreorderStatus } from "@/types/database.types";
 
 const CATEGORY_TABS = [
-  { value: "all", label: "Todas" },
-  { value: "ROPA", label: "Ropa" },
   { value: "CALZADO", label: "Calzado" },
+  { value: "ROPA", label: "Ropa" },
   { value: "PERFUME", label: "Perfume" },
   { value: "OTRO", label: "Otro" },
 ] as const;
@@ -32,15 +31,15 @@ export function PreorderList({
   preorders: PreorderCardData[];
   clients: { id: string; name: string }[];
 }) {
-  const [category, setCategory] = React.useState<string>("all");
+  // Arranca en Calzado, que es la categoría que más se encarga.
+  const [category, setCategory] = React.useState<string>("CALZADO");
   // Se abre en lo que falta por comprar, que es el trabajo del día.
   const [status, setStatus] = React.useState<PreorderStatus>("PENDENT");
 
   const filtered = React.useMemo(() => {
-    return preorders.filter((p) => {
-      const matchesCategory = category === "all" || p.category === category;
-      return matchesCategory && p.status === status;
-    });
+    return preorders.filter(
+      (p) => p.category === category && p.status === status
+    );
   }, [preorders, category, status]);
 
   // Se pagina lo ya filtrado: las pestañas siguen viendo todos los pedidos.
