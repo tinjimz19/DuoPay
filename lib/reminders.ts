@@ -295,6 +295,65 @@ export function buildInstallmentReminderMessage(params: {
   return out.join("\n");
 }
 
+/**
+ * Recibo de un abono ya cobrado.
+ *
+ * No pide plata: confirma que se recibió. Es el mensaje que la tienda manda
+ * después de cobrar, y evita el ida y vuelta de "¿te llegó?" — el cliente ve
+ * cuánto abonó, en bolívares a la tasa del día, y cuánto le queda.
+ *
+ * El bolívar de cada cifra se saca de esa cifra sola, no de un total: aquí
+ * hay dos montos independientes —lo abonado y el saldo—, así que no hay una
+ * suma de líneas que cuadrar como en los recordatorios.
+ */
+export function buildPaymentReceiptMessage(params: {
+  businessName: string | null | undefined;
+  clientName: string;
+  saleDescription: string;
+  amountPaid: number;
+  /** Lo que queda por pagar DESPUÉS de este abono. 0 = saldada. */
+  remaining: number;
+  /** Bolívares por unidad. Sin tasa, el recibo sale solo en referencia. */
+  rate?: number | null;
+}): string {
+  const business = params.businessName?.trim() || "nuestra tienda";
+
+  const rate = params.rate;
+  const hasRate = rate != null && Number.isFinite(rate) && rate > 0;
+  const conBs = (amount: number) =>
+    hasRate
+      ? `${formatCurrency(amount)} · ${formatBs(round2(amount * (rate as number)))}`
+      : formatCurrency(amount);
+
+  const saldada = params.remaining <= 0;
+
+  const out = [
+    `Hola ${params.clientName}, te saluda ${business}.`,
+    "",
+    `Recibimos tu abono de ${conBs(params.amountPaid)}.`,
+    "",
+    `Compra: ${params.saleDescription}`,
+    saldada
+      ? "¡Quedas al día! No te queda saldo pendiente."
+      : // El saldo va solo en referencia, sin bolívares: el bolívar del saldo
+        // cambia con la tasa y ponerlo hoy da una cifra que mañana no cuadra.
+        // El bolívar que importa es el de lo que se acaba de abonar.
+        `Saldo pendiente: ${formatCurrency(params.remaining)}`,
+  ];
+
+  // De dónde salió el número en bolívares, igual que en los recordatorios.
+  if (hasRate) {
+    out.push("", `Calculado a la tasa BCV de hoy: ${formatBs(rate as number)}`);
+  }
+
+  out.push(
+    "",
+    saldada ? "¡Gracias por tu compra!" : "¡Gracias por tu pago!"
+  );
+
+  return out.join("\n");
+}
+
 export function whatsappReminderUrl(phone: string, message: string): string {
   return `https://wa.me/${normalizePhone(phone)}?text=${encodeURIComponent(message)}`;
 }
