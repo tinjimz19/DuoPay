@@ -979,3 +979,60 @@ REVOKE ALL ON FUNCTION public.category_usage() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.category_usage() TO authenticated;
 
 -- Para una base que YA existe, ejecuta supabase/patch-05-categorias.sql.
+
+
+-- ------------------------------------------------------------
+-- 18. CATÁLOGO DE PRODUCTOS (para compartir / exportar a PDF)
+--
+-- Independiente del inventario: material para enseñar, sin stock. En pantalla
+-- la función se muestra solo a la cuenta autorizada (lib/catalog-access.ts);
+-- la base igual aísla por user_id.
+-- Para una base que YA existe, ejecuta supabase/patch-06-catalogo.sql.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.catalog_products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  name TEXT NOT NULL CHECK (length(btrim(name)) > 0),
+  category TEXT NOT NULL DEFAULT 'CALZADO' CHECK (category ~ '^[A-Z0-9_]{2,32}$'),
+  price NUMERIC(10, 2) CHECK (price IS NULL OR price >= 0),
+  note TEXT,
+  image_path TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.catalog_products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Aislamiento por usuario en catalogo" ON public.catalog_products;
+CREATE POLICY "Aislamiento por usuario en catalogo"
+  ON public.catalog_products FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_catalog_user
+  ON public.catalog_products(user_id, category, created_at)
+  WHERE deleted_at IS NULL;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('catalogo', 'catalogo', false)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Tienda sube imagenes de catalogo" ON storage.objects;
+CREATE POLICY "Tienda sube imagenes de catalogo"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'catalogo' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda ve sus imagenes de catalogo" ON storage.objects;
+CREATE POLICY "Tienda ve sus imagenes de catalogo"
+  ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'catalogo' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda reemplaza sus imagenes de catalogo" ON storage.objects;
+CREATE POLICY "Tienda reemplaza sus imagenes de catalogo"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'catalogo' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Tienda borra sus imagenes de catalogo" ON storage.objects;
+CREATE POLICY "Tienda borra sus imagenes de catalogo"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'catalogo' AND (storage.foldername(name))[1] = auth.uid()::text);

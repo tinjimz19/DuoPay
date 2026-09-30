@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/navigation/sidebar";
 import { SetupNotice } from "@/components/setup-notice";
 import type { SubscriptionTone } from "@/components/subscription/subscription-badge";
 import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
+import { puedeVerCatalogo } from "@/lib/catalog-access";
 import { allCategories } from "@/lib/categories-server";
 import { formatDateShort } from "@/lib/format";
 import { daysLeft, getEffectiveStatus } from "@/lib/subscription";
@@ -35,6 +36,10 @@ export default async function DashboardLayout({
   }
 
   const profile = account.profile;
+
+  // La función de catálogo es a la medida de una cuenta: el menú la muestra
+  // solo a los correos autorizados.
+  const showCatalog = puedeVerCatalogo(account.email);
 
   // El super admin solo opera su panel. Esta puerta vivía en el middleware,
   // donde costaba una consulta extra en cada request.
@@ -81,7 +86,7 @@ export default async function DashboardLayout({
   return (
     <CategoriesProvider categories={categories}>
     <div className="app-shell flex flex-col bg-slate-50 dark:bg-slate-950">
-      <Sidebar />
+      <Sidebar showCatalog={showCatalog} />
       <div className="flex flex-1 flex-col md:pl-64">
         <Header
           email={account.email}
@@ -94,7 +99,7 @@ export default async function DashboardLayout({
           {children}
         </main>
       </div>
-      <BottomNav />
+      <BottomNav showCatalog={showCatalog} />
     </div>
     </CategoriesProvider>
   );

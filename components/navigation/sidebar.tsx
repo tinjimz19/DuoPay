@@ -5,6 +5,7 @@ import {
   Boxes,
   HandCoins,
   Home,
+  Images,
   Package,
   ShoppingBag,
   Trash2,
@@ -16,7 +17,7 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
-const items = [
+const baseItems = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/cobranza", label: "Cobranza", icon: HandCoins },
   { href: "/ventas", label: "Ventas", icon: ShoppingBag },
@@ -27,8 +28,15 @@ const items = [
   { href: "/papelera", label: "Papelera", icon: Trash2 },
 ];
 
-export function Sidebar() {
+const CATALOGO_ITEM = { href: "/catalogo", label: "Catálogo", icon: Images };
+
+export function Sidebar({ showCatalog = false }: { showCatalog?: boolean }) {
   const pathname = usePathname();
+
+  // El catálogo va después de Pedidos, solo para las cuentas autorizadas.
+  const items = showCatalog
+    ? [...baseItems.slice(0, 7), CATALOGO_ITEM, ...baseItems.slice(7)]
+    : baseItems;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">

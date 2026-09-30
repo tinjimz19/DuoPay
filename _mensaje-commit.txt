@@ -1,0 +1,27 @@
+feat(pedidos): foto de referencia y convertir un pedido en venta
+
+El pedido acepta una foto. Se encoge a 1280 px en el navegador —unos
+150 KB— y va a un deposito privado de Supabase, dentro de la carpeta de
+cada tienda. Las direcciones se firman por una hora: el deposito no es
+publico y no hay ninguna URL fija que sirva siempre.
+
+Convertir crea la venta y marca el pedido dentro de UNA transaccion en la
+base (funcion convertir_pedido_en_venta), con la fila del pedido
+bloqueada. Hechas por separado, si la segunda escritura falla queda una
+venta creada y un pedido que todavia enseña el boton: el siguiente toque
+crea una segunda venta y el cliente aparece debiendo el doble.
+
+Esa funcion tambien es lo que evita duplicar la logica en la app movil,
+que habla con la base directamente y no tiene servidor propio.
+
+El dialogo de conversion solo pregunta los tres huecos que un pedido no
+tiene y una venta necesita: el cliente (un pedido puede llevar solo un
+nombre suelto), el monto real y las cuotas. Categoria y nota se copian.
+
+La regla de las fotos vive en lib/images.ts, compartida con el movil: la
+primera carpeta de la ruta es lo que compara la politica del deposito, o
+sea que las dos aplicaciones tienen que armarla igual o las subidas se
+rechazan. Van 31 pruebas.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017RK7guemYuzj8vsR3yhZvC

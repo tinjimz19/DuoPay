@@ -6,6 +6,7 @@ import {
   Loader2,
   MoreHorizontal,
   Pencil,
+  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import { formatBs, formatCurrency, formatTimeShort } from "@/lib/format";
 import { moneyInputValue, parseMoney } from "@/lib/money";
 import {
   buildInstallmentReminderMessage,
+  buildPaymentReceiptMessage,
   whatsappReminderUrl,
 } from "@/lib/reminders";
 import {
@@ -290,6 +292,16 @@ export function SaleCard({
   const [pending, startTransition] = React.useTransition();
   const [customAmount, setCustomAmount] = React.useState("");
   const [notes, setNotes] = React.useState("");
+  /*
+    Lo que se acaba de cobrar, para ofrecer el recibo. Se guarda al momento
+    del abono y no se lee de las props: cuando la página se refresca, el saldo
+    de la venta ya cambió, y el recibo tiene que decir lo que se cobró ESTA
+    vez, no el estado nuevo.
+  */
+  const [recibo, setRecibo] = React.useState<{
+    abonado: number;
+    saldo: number;
+  } | null>(null);
   const euroRate = rate ?? null;
 
   const paid = Number(sale.amount_paid);
@@ -335,9 +347,15 @@ export function SaleCard({
             ? `Se registró ${formatCurrency(res.amount)}: era todo lo que faltaba`
             : "Abono registrado"
         );
+        // El saldo tras este abono, calculado con lo realmente cobrado (que
+        // puede venir recortado si era más que lo que faltaba).
+        setRecibo({
+          abonado: res.amount,
+          saldo: Math.max(0, remaining - res.amount),
+        });
         setCustomAmount("");
         setNotes("");
-        setOpen(false);
+        // No se cierra el diálogo: encima aparece el recibo para enviar.
         router.refresh();
       } else {
         toast.error(res.error);
@@ -355,7 +373,14 @@ export function SaleCard({
 
   return (
     <div className="relative">
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          // Al cerrar se descarta el recibo pendiente: es de ese cobro.
+          if (!v) setRecibo(null);
+        }}
+      >
         <DialogTrigger asChild>
           <button
             type="button"
@@ -431,6 +456,72 @@ export function SaleCard({
               {sale.item_description} · {sale.client_name}
             </DialogDescription>
           </DialogHeader>
+
+          {recibo && (
+            <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/40">
+              <p className="text-sm text-emerald-800 dark:text-emerald-200">
+                Abono registrado:{" "}
+                <span className="font-semibold">
+                  {formatCurrency(recibo.abonado)}
+                </span>
+                .{" "}
+                {recibo.saldo > 0 ? (
+                  <>
+                    Saldo:{" "}
+                    <span className="font-semibold">
+                      {formatCurrency(recibo.saldo)}
+                    </span>
+                    .
+                  </>
+                ) : (
+                  "Queda al día."
+                )}
+              </p>
+
+              {sale.client_phone ? (
+                <Button
+                  asChild
+                  className="h-11 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  <a
+                    href={whatsappReminderUrl(
+                      sale.client_phone,
+                      buildPaymentReceiptMessage({
+                        businessName,
+                        clientName: sale.client_name,
+                        saleDescription: sale.item_description,
+                        amountPaid: recibo.abonado,
+                        remaining: recibo.saldo,
+                        rate: euroRate,
+                      })
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      setRecibo(null);
+                      setOpen(false);
+                    }}
+                  >
+                    <Send className="h-4 w-4" />
+                    Enviar recibo por WhatsApp
+                  </a>
+                </Button>
+              ) : (
+                <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                  Agrégale el teléfono al cliente para poder enviarle el recibo.
+                </p>
+              )}
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 w-full"
+                onClick={() => setRecibo(null)}
+              >
+                Seguir aquí
+              </Button>
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">

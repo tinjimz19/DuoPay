@@ -21,6 +21,9 @@
 /** El depósito. Privado: las direcciones se firman al mostrarlas. */
 export const BUCKET_DE_PEDIDOS = "pedidos";
 
+/** El depósito de las imágenes del catálogo. Privado, igual que el de pedidos. */
+export const BUCKET_DE_CATALOGO = "catalogo";
+
 /** El lado largo al que se encoge la foto antes de subirla. */
 export const LADO_MAXIMO = 1280;
 
@@ -62,6 +65,26 @@ export function rutaDeFotoDePedido(
 ): string {
   const limpia = extension.replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
   return `${userId}/${pedidoId}-${ahora}.${limpia}`;
+}
+
+/**
+ * La ruta de la imagen de un producto del catálogo dentro del depósito.
+ *
+ * `<id de la tienda>/<id del producto>-<momento>.<extensión>`
+ *
+ * Misma forma que la de pedidos, y por el mismo motivo: la política del
+ * depósito exige que la primera carpeta sea el id de quien sube, y el
+ * momento en el nombre evita que la caché del navegador siga mostrando la
+ * imagen vieja tras reemplazarla.
+ */
+export function rutaDeImagenDeCatalogo(
+  userId: string,
+  productId: string,
+  extension = "jpg",
+  ahora: number = Date.now()
+): string {
+  const limpia = extension.replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
+  return `${userId}/${productId}-${ahora}.${limpia}`;
 }
 
 /**

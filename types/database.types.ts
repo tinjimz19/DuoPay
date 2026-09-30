@@ -292,6 +292,50 @@ export interface Database {
           }
         ];
       };
+      catalog_products: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          category: ProductCategory;
+          price: number | null;
+          note: string | null;
+          /** Ruta dentro del depósito `catalogo`, no una dirección web. */
+          image_path: string | null;
+          created_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          category?: ProductCategory;
+          price?: number | null;
+          note?: string | null;
+          image_path?: string | null;
+          created_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          category?: ProductCategory;
+          price?: number | null;
+          note?: string | null;
+          image_path?: string | null;
+          created_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "catalog_products_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       products: {
         Row: {
           id: string;
