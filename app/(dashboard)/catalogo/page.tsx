@@ -67,11 +67,7 @@ export default async function CatalogoPage() {
         <CatalogFormDialog />
       </div>
 
-      <CatalogList
-        items={items}
-        businessName={account.profile?.business_name ?? null}
-        logoUrl={account.profile?.logo_url ?? null}
-      />
+      <CatalogList items={items} />
     </div>
   );
 }

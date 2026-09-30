@@ -13,6 +13,7 @@ import {
   updateCatalogProduct,
 } from "@/actions/catalog-actions";
 import type { CatalogItem } from "@/components/catalog/catalog-card";
+import { ImageCropper } from "@/components/catalog/image-cropper";
 import { useCategories } from "@/components/categories-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,6 +91,8 @@ export function CatalogFormDialog({
   const [archivo, setArchivo] = React.useState<File | null>(null);
   const [vistaPrevia, setVistaPrevia] = React.useState<string | null>(null);
   const [quitarFoto, setQuitarFoto] = React.useState(false);
+  // La foto recién elegida, esperando a que se recorte cuadrada.
+  const [recorte, setRecorte] = React.useState<File | null>(null);
   const entradaDeArchivo = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -137,8 +140,11 @@ export function CatalogFormDialog({
       if (entradaDeArchivo.current) entradaDeArchivo.current.value = "";
       return;
     }
-    setQuitarFoto(false);
-    setArchivo(elegido);
+    // No se sube directo: primero pasa por el recorte cuadrado.
+    setRecorte(elegido);
+    // Se limpia el input para que elegir la MISMA foto otra vez vuelva a abrir
+    // el recorte (si no, onChange no dispara con el mismo archivo).
+    if (entradaDeArchivo.current) entradaDeArchivo.current.value = "";
   }
 
   function handleOpenChange(next: boolean) {
@@ -312,9 +318,22 @@ export function CatalogFormDialog({
                 onChange={(e) => elegirArchivo(e.target.files?.[0] ?? null)}
               />
               <p className="text-xs text-slate-400">
-                Se comprime sola antes de subir, para no gastar espacio.
+                Se recorta cuadrada y se comprime antes de subir.
               </p>
             </div>
+
+            {recorte && (
+              <ImageCropper
+                file={recorte}
+                open
+                onCancel={() => setRecorte(null)}
+                onCropped={(recortada) => {
+                  setQuitarFoto(false);
+                  setArchivo(recortada);
+                  setRecorte(null);
+                }}
+              />
+            )}
 
             <FormField
               control={form.control}

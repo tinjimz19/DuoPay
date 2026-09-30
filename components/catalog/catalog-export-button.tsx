@@ -84,13 +84,9 @@ function hoyArchivo(): string {
 
 export function CatalogExportButton({
   items,
-  businessName,
-  logoUrl,
   categoryLabel,
 }: {
   items: CatalogItem[];
-  businessName: string | null;
-  logoUrl: string | null;
   categoryLabel: (slug: string) => string;
 }) {
   const [loading, setLoading] = React.useState(false);
@@ -116,37 +112,19 @@ export function CatalogExportButton({
           if (it.image_url) imagenes.set(it.id, await cargarImagen(it.image_url));
         })
       );
-      const logo = logoUrl ? await cargarImagen(logoUrl) : null;
-
-      // --- PORTADA ---
-      let y = 46;
-      if (logo) {
-        const lw = 44;
-        const lh = (lw * logo.h) / logo.w;
-        doc.addImage(logo.dataUrl, "JPEG", (W - lw) / 2, y, lw, lh);
-        y += lh + 12;
+      // --- PORTADA FIJA ---
+      // Imagen de marca a página completa sobre fondo negro. Es siempre la
+      // misma (public/catalogo-portada.jpg); solo esta cuenta usa la función,
+      // así que la portada no se sube ni cambia, va fija con la app.
+      const portada = await cargarImagen("/catalogo-portada.jpg");
+      let coverDibujada = false;
+      if (portada) {
+        doc.setFillColor(0, 0, 0);
+        doc.rect(0, 0, W, H, "F");
+        const lado = W; // cuadrada, a todo el ancho de la página
+        doc.addImage(portada.dataUrl, "JPEG", 0, (H - lado) / 2, lado, lado);
+        coverDibujada = true;
       }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(28);
-      doc.setTextColor(20, 20, 30);
-      doc.text(businessName?.trim() || "Catálogo", W / 2, y, {
-        align: "center",
-        maxWidth: W - 2 * M,
-      });
-      y += 14;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(15);
-      doc.setTextColor(110, 110, 120);
-      doc.text("Catálogo de productos", W / 2, y, { align: "center" });
-      y += 9;
-      doc.setFontSize(11);
-      const fecha = new Intl.DateTimeFormat("es-VE", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-        timeZone: "America/Caracas",
-      }).format(new Date());
-      doc.text(fecha, W / 2, y, { align: "center" });
 
       // --- PRODUCTOS ---
       const grupos = new Map<string, CatalogItem[]>();
@@ -163,7 +141,10 @@ export function CatalogExportButton({
       const textoH = 22;
       const cardH = imgH + 4 + textoH;
 
-      doc.addPage();
+      // Los productos empiezan en página nueva solo si hubo portada; si la
+      // imagen no cargó, se aprovecha la primera página en vez de dejarla en
+      // blanco.
+      if (coverDibujada) doc.addPage();
       let cursorY = M;
 
       const encabezado = (label: string, cont = false) => {

@@ -9,15 +9,7 @@ import { useCategories } from "@/components/categories-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { ordenarCategorias } from "@/lib/catalog-order";
 
-export function CatalogList({
-  items,
-  businessName,
-  logoUrl,
-}: {
-  items: CatalogItem[];
-  businessName: string | null;
-  logoUrl: string | null;
-}) {
+export function CatalogList({ items }: { items: CatalogItem[] }) {
   const categorias = useCategories();
 
   const grupos = React.useMemo(() => {
@@ -46,8 +38,6 @@ export function CatalogList({
         </p>
         <CatalogExportButton
           items={items}
-          businessName={businessName}
-          logoUrl={logoUrl}
           categoryLabel={(slug) => categorias.label(slug)}
         />
       </div>
