@@ -8,7 +8,7 @@
  * Esto decide la VISIBILIDAD (el menú y la página). El aislamiento de los
  * datos lo sigue haciendo la base por user_id, como en todo lo demás.
  */
-export const CATALOGO_EMAILS = ["tinjimz19@gmail.com"] as const;
+export const CATALOGO_EMAILS = ["tinjimz67@gmail.com"] as const;
 
 export function puedeVerCatalogo(email: string | null | undefined): boolean {
   if (!email) return false;
