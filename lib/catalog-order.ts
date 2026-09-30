@@ -9,7 +9,7 @@ export function ordenarCategorias(
   slugs: string[],
   label: (slug: string) => string
 ): string[] {
-  return [...new Set(slugs)].sort((a, b) => {
+  return Array.from(new Set(slugs)).sort((a, b) => {
     if (a === "CALZADO") return -1;
     if (b === "CALZADO") return 1;
     return label(a).localeCompare(label(b), "es");
