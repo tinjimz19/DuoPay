@@ -135,10 +135,11 @@ export function CatalogExportButton({
       }
       const orden = ordenarCategorias(Array.from(grupos.keys()), categoryLabel);
 
-      const gap = 6;
-      const colW = (W - 2 * M - gap) / 2; // 90mm
-      const imgH = 62;
-      const textoH = 22;
+      const cols = 3;
+      const gap = 5;
+      const colW = (W - 2 * M - gap * (cols - 1)) / cols; // ~58.7mm
+      const imgH = 46;
+      const textoH = 20;
       const cardH = imgH + 4 + textoH;
 
       // Los productos empiezan en página nueva solo si hubo portada; si la
@@ -175,26 +176,26 @@ export function CatalogExportButton({
           doc.addImage(im.dataUrl, "JPEG", ix, iy, dw, dh);
         }
 
-        // Texto debajo.
-        let ty = cursorY + imgH + 6;
+        // Texto debajo (más compacto, porque la tarjeta es más angosta con 3).
+        let ty = cursorY + imgH + 5;
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(10.5);
+        doc.setFontSize(9);
         doc.setTextColor(20, 20, 30);
         const nombre = doc.splitTextToSize(it.name, colW).slice(0, 2);
         doc.text(nombre, x, ty);
-        ty += nombre.length * 4.6 + 1;
+        ty += nombre.length * 4 + 1;
 
         if (it.price !== null) {
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(11);
+          doc.setFontSize(9.5);
           doc.setTextColor(60, 60, 200);
           doc.text(formatCurrency(it.price), x, ty);
-          ty += 5;
+          ty += 4.5;
         }
 
         if (it.note) {
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(8.5);
+          doc.setFontSize(7.5);
           doc.setTextColor(120, 120, 130);
           const nota = doc.splitTextToSize(it.note, colW).slice(0, 1);
           doc.text(nota, x, ty);
@@ -212,14 +213,16 @@ export function CatalogExportButton({
         }
         encabezado(categoryLabel(slug));
 
-        for (let i = 0; i < lista.length; i += 2) {
+        for (let i = 0; i < lista.length; i += cols) {
           if (cursorY + cardH > abajo) {
             doc.addPage();
             cursorY = M;
             encabezado(categoryLabel(slug), true);
           }
-          dibujarProducto(lista[i], M);
-          if (lista[i + 1]) dibujarProducto(lista[i + 1], M + colW + gap);
+          for (let j = 0; j < cols; j++) {
+            const it = lista[i + j];
+            if (it) dibujarProducto(it, M + j * (colW + gap));
+          }
           cursorY += cardH + gap;
         }
         cursorY += 4;
