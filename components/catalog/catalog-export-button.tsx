@@ -139,7 +139,7 @@ export function CatalogExportButton({
       const gap = 5;
       const colW = (W - 2 * M - gap * (cols - 1)) / cols; // ~58.7mm
       const imgH = 46;
-      const textoH = 20;
+      const textoH = 23;
       const cardH = imgH + 4 + textoH;
 
       // Los productos empiezan en página nueva solo si hubo portada; si la
@@ -177,25 +177,25 @@ export function CatalogExportButton({
         }
 
         // Texto debajo (más compacto, porque la tarjeta es más angosta con 3).
-        let ty = cursorY + imgH + 5;
+        let ty = cursorY + imgH + 5.5;
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
+        doc.setFontSize(10.5);
         doc.setTextColor(20, 20, 30);
         const nombre = doc.splitTextToSize(it.name, colW).slice(0, 2);
         doc.text(nombre, x, ty);
-        ty += nombre.length * 4 + 1;
+        ty += nombre.length * 4.6 + 1.5;
 
         if (it.price !== null) {
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(9.5);
+          doc.setFontSize(11);
           doc.setTextColor(60, 60, 200);
           doc.text(formatCurrency(it.price), x, ty);
-          ty += 4.5;
+          ty += 5;
         }
 
         if (it.note) {
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(7.5);
+          doc.setFontSize(9);
           doc.setTextColor(120, 120, 130);
           const nota = doc.splitTextToSize(it.note, colW).slice(0, 1);
           doc.text(nota, x, ty);
