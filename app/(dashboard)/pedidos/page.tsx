@@ -1,4 +1,3 @@
-import { PreorderFormDialog } from "@/components/preorders/preorder-form-dialog";
 import { PreorderList } from "@/components/preorders/preorder-list";
 import { createClient } from "@/lib/supabase/server";
 import type { PreorderCardData } from "@/components/preorders/preorder-card";
@@ -12,20 +11,25 @@ export default async function PedidosPage({
 }) {
   const supabase = createClient();
 
-  const [{ data: preorders }, { data: clients }] = await Promise.all([
-    supabase
-      .from("preorders")
-      .select(
-        "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, image_path, sale_id, clients(name)"
-      )
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("clients")
-      .select("id, name")
-      .is("deleted_at", null)
-      .order("name"),
-  ]);
+  const [{ data: preorders }, { data: clients }, { data: trips }] =
+    await Promise.all([
+      supabase
+        .from("preorders")
+        .select(
+          "id, product_name, category, client_id, client_name_raw, quantity, estimated_price, status, notes, created_at, image_path, sale_id, trip_id, clients(name), trips(travel_date)"
+        )
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("clients")
+        .select("id, name")
+        .is("deleted_at", null)
+        .order("name"),
+      supabase
+        .from("trips")
+        .select("id, travel_date")
+        .order("travel_date", { ascending: true }),
+    ]);
 
   /*
     Las direcciones de las fotos se firman aquí, en el servidor.
@@ -66,27 +70,30 @@ export default async function PedidosPage({
     image_path: p.image_path,
     image_url: p.image_path ? (firmadas.get(p.image_path) ?? null) : null,
     sale_id: p.sale_id,
+    trip_id: p.trip_id,
+    trip_date:
+      (p.trips as unknown as { travel_date: string } | null)?.travel_date ??
+      null,
   }));
 
   const openNew = searchParams.nuevo === "1";
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            Pedidos / Encargos
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Para tu próxima compra de mercancía
-          </p>
-        </div>
-        <PreorderFormDialog
-          clients={clients ?? []}
-          defaultOpen={openNew}
-        />
+      <div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+          Pedidos / Encargos
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Para tu próxima compra de mercancía
+        </p>
       </div>
-      <PreorderList preorders={mapped} clients={clients ?? []} />
+      <PreorderList
+        preorders={mapped}
+        clients={clients ?? []}
+        trips={trips ?? []}
+        openNew={openNew}
+      />
     </div>
   );
 }

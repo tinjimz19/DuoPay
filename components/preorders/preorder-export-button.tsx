@@ -27,8 +27,14 @@ const SEPARADOR = "----------------------------------------";
 
 export function PreorderExportButton({
   preorders,
+  tripTitulo,
+  tripArchivo,
 }: {
   preorders: PreorderCardData[];
+  /** Encabezado del archivo, p. ej. "Viaje 7 de octubre" o "Sin viaje". */
+  tripTitulo: string;
+  /** Parte del nombre de archivo, p. ej. "viaje-2026-10-07" o "sin-viaje". */
+  tripArchivo: string;
 }) {
   const categorias = useCategories();
   const pendientes = preorders.filter((p) => p.status === "PENDENT");
@@ -36,8 +42,12 @@ export function PreorderExportButton({
 
   function exportar() {
     if (vacio) return;
-    const texto = construirTxt(pendientes, (slug) => categorias.label(slug));
-    descargar(texto, `pedidos-pendientes-${hoyArchivo()}.txt`);
+    const texto = construirTxt(
+      pendientes,
+      (slug) => categorias.label(slug),
+      tripTitulo
+    );
+    descargar(texto, `pedidos-${tripArchivo}-${hoyArchivo()}.txt`);
     toast.success("Pedidos pendientes exportados");
   }
 
@@ -63,11 +73,12 @@ function nombreCliente(p: PreorderCardData): string {
 
 function construirTxt(
   preorders: PreorderCardData[],
-  etiquetaCategoria: (slug: string | null | undefined) => string
+  etiquetaCategoria: (slug: string | null | undefined) => string,
+  titulo: string
 ): string {
   const lineas: string[] = [];
 
-  lineas.push("PEDIDOS PENDIENTES");
+  lineas.push(`PEDIDOS PENDIENTES · ${titulo}`);
   lineas.push(`Generado: ${formatDateTime(new Date())}`);
   lineas.push(
     `Total: ${preorders.length} ${preorders.length === 1 ? "pedido" : "pedidos"}`

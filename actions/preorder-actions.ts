@@ -34,6 +34,8 @@ const createPreorderSchema = z.object({
   clientNameRaw: z.string().max(120).optional().nullable(),
   // Alta de cliente desde este mismo formulario.
   newClient: newClientSchema.optional().nullable(),
+  // El viaje al que se ancla el pedido. Vacío = "Sin viaje".
+  tripId: optionalUuid,
   quantity: z.coerce.number().int().min(1).max(1000).default(1),
   estimatedPrice: z.coerce
     .number()
@@ -81,6 +83,7 @@ export async function createPreorder(input: CreatePreorderInput) {
       category: parsed.category,
       client_id: clientId,
       client_name_raw: parsed.clientNameRaw?.trim() || null,
+      trip_id: parsed.tripId,
       quantity: parsed.quantity,
       estimated_price: parsed.estimatedPrice ?? null,
       status: parsed.status,
@@ -138,6 +141,7 @@ const updatePreorderSchema = z.object({
   clientId: optionalUuid,
   clientNameRaw: z.string().max(120).optional().nullable(),
   newClient: newClientSchema.optional().nullable(),
+  tripId: optionalUuid,
   quantity: z.coerce.number().int().min(1).max(1000),
   estimatedPrice: z.coerce.number().min(0).max(99999999).optional().nullable(),
   status: z.enum(STATUSES),
@@ -177,6 +181,7 @@ export async function updatePreorder(input: z.infer<typeof updatePreorderSchema>
       category: parsed.category,
       client_id: clientId,
       client_name_raw: parsed.clientNameRaw?.trim() || null,
+      trip_id: parsed.tripId,
       quantity: parsed.quantity,
       estimated_price: parsed.estimatedPrice ?? null,
       status: parsed.status,

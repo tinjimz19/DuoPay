@@ -244,6 +244,8 @@ export interface Database {
           image_path: string | null;
           /** Lleno = este pedido ya se convirtió en esa venta. */
           sale_id: string | null;
+          /** Viaje al que está anclado el pedido. NULL = "Sin viaje". */
+          trip_id: string | null;
         };
         Insert: {
           id?: string;
@@ -260,6 +262,7 @@ export interface Database {
           deleted_at?: string | null;
           image_path?: string | null;
           sale_id?: string | null;
+          trip_id?: string | null;
         };
         Update: {
           id?: string;
@@ -276,6 +279,7 @@ export interface Database {
           deleted_at?: string | null;
           image_path?: string | null;
           sale_id?: string | null;
+          trip_id?: string | null;
         };
         Relationships: [
           {
@@ -288,6 +292,40 @@ export interface Database {
             foreignKeyName: "preorders_client_id_fkey";
             columns: ["client_id"];
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "preorders_trip_id_fkey";
+            columns: ["trip_id"];
+            referencedRelation: "trips";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      trips: {
+        Row: {
+          id: string;
+          user_id: string;
+          travel_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          travel_date: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          travel_date?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trips_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
             referencedColumns: ["id"];
           }
         ];

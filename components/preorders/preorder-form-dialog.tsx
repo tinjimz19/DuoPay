@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/ui/money-input";
 import { moneyInputValue, parseMoney } from "@/lib/money";
+import { SIN_VIAJE, etiquetaViajeLarga, type Trip } from "@/lib/trip";
 import {
   Select,
   SelectContent,
@@ -70,6 +71,8 @@ export interface PreorderFormData {
   image_path?: string | null;
   /** Dirección firmada de la foto que ya tiene, para la vista previa. */
   image_url?: string | null;
+  /** Viaje al que está anclado. NULL = "Sin viaje". */
+  trip_id?: string | null;
 }
 
 const preorderSchema = z.object({
@@ -92,6 +95,8 @@ type PreorderValues = z.infer<typeof preorderSchema>;
 export function PreorderFormDialog({
   preorder,
   clients,
+  trips = [],
+  defaultTripId = null,
   defaultOpen = false,
   open,
   hideTrigger = false,
@@ -99,6 +104,10 @@ export function PreorderFormDialog({
 }: {
   preorder?: PreorderFormData | null;
   clients: { id: string; name: string }[];
+  /** Los viajes disponibles para anclar el pedido. */
+  trips?: Trip[];
+  /** En un pedido nuevo, el viaje con el que arranca (el seleccionado arriba). */
+  defaultTripId?: string | null;
   defaultOpen?: boolean;
   open?: boolean;
   hideTrigger?: boolean;
@@ -113,6 +122,19 @@ export function PreorderFormDialog({
       : { kind: "none" }
   );
   const [showClientError, setShowClientError] = React.useState(false);
+
+  // El viaje elegido (SIN_VIAJE o el id). En edición arranca con el del
+  // pedido; en alta, con el viaje seleccionado arriba.
+  const esEdicion = Boolean(preorder);
+  const [tripSel, setTripSel] = React.useState<string>(
+    esEdicion ? (preorder?.trip_id ?? SIN_VIAJE) : (defaultTripId ?? SIN_VIAJE)
+  );
+
+  // En un pedido NUEVO, si arriba cambia el viaje seleccionado mientras el
+  // diálogo está cerrado, el próximo que se abra debe nacer en ese viaje.
+  React.useEffect(() => {
+    if (!esEdicion) setTripSel(defaultTripId ?? SIN_VIAJE);
+  }, [defaultTripId, esEdicion]);
 
   // --- la foto ---------------------------------------------------------
   const [archivo, setArchivo] = React.useState<File | null>(null);
@@ -165,6 +187,7 @@ export function PreorderFormDialog({
     form.reset(vacio);
     setClient({ kind: "none" });
     setShowClientError(false);
+    setTripSel(defaultTripId ?? SIN_VIAJE);
     limpiarFoto();
   }
 
@@ -266,6 +289,7 @@ export function PreorderFormDialog({
         client.kind === "new"
           ? { name: client.name, phone: client.phone }
           : null,
+      tripId: tripSel === SIN_VIAJE ? null : tripSel,
       quantity: Number(values.quantity),
       estimatedPrice:
         values.estimatedPrice === "" || values.estimatedPrice === undefined
@@ -458,6 +482,24 @@ export function PreorderFormDialog({
               }}
               showError={showClientError}
             />
+
+            {/* Viaje: Label a secas (no es un campo de react-hook-form). */}
+            <div className="space-y-2">
+              <Label htmlFor="viaje-pedido">Viaje</Label>
+              <Select value={tripSel} onValueChange={setTripSel}>
+                <SelectTrigger id="viaje-pedido" className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_VIAJE}>Sin viaje</SelectItem>
+                  {trips.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {etiquetaViajeLarga(t.travel_date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <FormField

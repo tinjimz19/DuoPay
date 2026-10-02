@@ -1,6 +1,13 @@
 "use client";
 
-import { ExternalLink, Loader2, Pencil, ShoppingCart, Trash2 } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  Pencil,
+  Plane,
+  ShoppingCart,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -14,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PREORDER_STATUS_OPTIONS, PREORDER_STATUS_STYLES } from "@/lib/labels";
 import { formatCurrency } from "@/lib/format";
+import { etiquetaViajeCorta, type Trip } from "@/lib/trip";
 import { cn } from "@/lib/utils";
 import type { PreorderStatus, ProductCategory } from "@/types/database.types";
 
@@ -34,14 +42,21 @@ export interface PreorderCardData {
   image_url: string | null;
   /** Lleno cuando este pedido ya se convirtió: entonces no se repite. */
   sale_id: string | null;
+  /** Viaje al que está anclado. NULL = "Sin viaje". */
+  trip_id: string | null;
+  /** La fecha del viaje, para la insignia. NULL = "Sin viaje". */
+  trip_date: string | null;
 }
 
 export function PreorderCard({
   preorder,
   clients,
+  trips,
 }: {
   preorder: PreorderCardData;
   clients: { id: string; name: string }[];
+  /** Los viajes, para el selector del diálogo de editar. */
+  trips: Trip[];
 }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
@@ -119,6 +134,19 @@ export function PreorderCard({
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {clientName} · Cantidad: {preorder.quantity ?? 1}
             </p>
+            <span
+              className={cn(
+                "mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                preorder.trip_date
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300"
+                  : "border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400"
+              )}
+            >
+              <Plane className="h-2.5 w-2.5" />
+              {preorder.trip_date
+                ? etiquetaViajeCorta(preorder.trip_date)
+                : "Sin viaje"}
+            </span>
             {preorder.estimated_price !== null &&
               preorder.estimated_price !== undefined && (
                 <p className="mt-0.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -225,6 +253,7 @@ export function PreorderCard({
       <PreorderFormDialog
         preorder={preorder}
         clients={clients}
+        trips={trips}
         open={editOpen}
         hideTrigger
         onOpenChange={setEditOpen}

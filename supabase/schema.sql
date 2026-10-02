@@ -1036,3 +1036,37 @@ DROP POLICY IF EXISTS "Tienda borra sus imagenes de catalogo" ON storage.objects
 CREATE POLICY "Tienda borra sus imagenes de catalogo"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'catalogo' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- ------------------------------------------------------------
+-- 19. VIAJES · los pedidos se anclan a una fecha de viaje
+--
+-- La tienda compra en fechas concretas (el 7, el 20…). Cada pedido se ancla
+-- a un viaje para no tenerlos regados; NULL = "Sin viaje". Al borrar un viaje
+-- sus pedidos vuelven a "Sin viaje" (ON DELETE SET NULL).
+-- Para una base que YA existe, ejecuta supabase/patch-07-viajes.sql.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.trips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  travel_date DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Aislamiento por usuario en viajes" ON public.trips;
+CREATE POLICY "Aislamiento por usuario en viajes"
+  ON public.trips FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_trips_user_date
+  ON public.trips(user_id, travel_date);
+
+ALTER TABLE public.preorders
+  ADD COLUMN IF NOT EXISTS trip_id UUID REFERENCES public.trips(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_preorders_trip
+  ON public.preorders(trip_id)
+  WHERE deleted_at IS NULL;
