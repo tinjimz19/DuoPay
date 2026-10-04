@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { caracasDateStr, formatCurrency } from "@/lib/format";
 import {
   BUCKET_DE_PEDIDOS,
@@ -78,6 +79,9 @@ export function CatalogToPreorderDialog({
     viajeInicial(trips)
   );
   const [cantidad, setCantidad] = React.useState("1");
+  // Detalles del pedido. Arranca con la nota del catálogo (tallas, color…) y
+  // se puede ajustar para lo que pidió este cliente en particular.
+  const [notas, setNotas] = React.useState(item.note ?? "");
 
   // Sustitución de foto (opcional). `archivo` lleno = se sube esa en vez de
   // reusar la del catálogo.
@@ -95,7 +99,10 @@ export function CatalogToPreorderDialog({
 
   // Al abrir, el viaje arranca en el próximo por venir.
   React.useEffect(() => {
-    if (open) setTripSel(viajeInicial(trips));
+    if (open) {
+      setTripSel(viajeInicial(trips));
+      setNotas(item.note ?? "");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -166,7 +173,7 @@ export function CatalogToPreorderDialog({
       productName: item.name,
       category: item.category,
       status: "PENDENT",
-      notes: item.note,
+      notes: notas.trim() || null,
       quantity: cantidadNum,
       estimatedPrice: item.price,
       clientId: client.kind === "existing" ? client.id : null,
@@ -315,6 +322,19 @@ export function CatalogToPreorderDialog({
               onChange={(e) => setCantidad(e.target.value)}
             />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="cat-pedido-notas">
+            Detalles <span className="text-slate-400">(opcional)</span>
+          </Label>
+          <Textarea
+            id="cat-pedido-notas"
+            rows={2}
+            placeholder="Talla, color, marca…"
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+          />
         </div>
 
         <Button

@@ -85,12 +85,16 @@ export function PreorderList({
     [preorders, coincideViaje]
   );
 
-  // Al buscar, se busca en TODO el viaje (sin importar la pestaña de categoría
-  // ni de estado): así el pedido aparece aunque esté en otra pestaña. Sin
-  // búsqueda, mandan las pestañas.
+  // Al buscar, se respeta el ESTADO seleccionado (pero se busca en todas las
+  // categorías del viaje): así solo salen coincidencias del estado activo, no
+  // pedidos de otros estados. Sin búsqueda, mandan las dos pestañas.
   const filtered = React.useMemo(() => {
     const q = comparable(query.trim());
-    if (q) return delViaje.filter((p) => coincideBusqueda(p, q));
+    if (q) {
+      return delViaje.filter(
+        (p) => p.status === status && coincideBusqueda(p, q)
+      );
+    }
     return delViaje.filter(
       (p) => p.category === category && p.status === status
     );
