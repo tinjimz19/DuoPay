@@ -21,11 +21,23 @@ export default async function CatalogoPage() {
 
   const supabase = createClient();
 
-  const { data: rows } = await supabase
-    .from("catalog_products")
-    .select("id, name, category, price, note, image_path, created_at")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  const [{ data: rows }, { data: clients }, { data: trips }] =
+    await Promise.all([
+      supabase
+        .from("catalog_products")
+        .select("id, name, category, price, note, image_path, created_at")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("clients")
+        .select("id, name")
+        .is("deleted_at", null)
+        .order("name"),
+      supabase
+        .from("trips")
+        .select("id, travel_date")
+        .order("travel_date", { ascending: true }),
+    ]);
 
   // Las direcciones de las imágenes se firman aquí, todas de una: el depósito
   // es privado y una por tarjeta serían decenas de viajes de red.
@@ -67,7 +79,11 @@ export default async function CatalogoPage() {
         <CatalogFormDialog />
       </div>
 
-      <CatalogList items={items} />
+      <CatalogList
+        items={items}
+        clients={clients ?? []}
+        trips={trips ?? []}
+      />
     </div>
   );
 }

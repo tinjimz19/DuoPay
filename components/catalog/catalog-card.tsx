@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageOff, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ImageOff, Loader2, Pencil, ShoppingCart, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -8,9 +8,11 @@ import { toast } from "sonner";
 import { deleteCatalogProduct } from "@/actions/catalog-actions";
 import { CategoryBadge } from "@/components/category-badge";
 import { CatalogFormDialog } from "@/components/catalog/catalog-form-dialog";
+import { CatalogToPreorderDialog } from "@/components/catalog/catalog-to-preorder-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
+import type { Trip } from "@/lib/trip";
 import type { ProductCategory } from "@/types/database.types";
 
 export interface CatalogItem {
@@ -25,9 +27,18 @@ export interface CatalogItem {
   image_url: string | null;
 }
 
-export function CatalogCard({ item }: { item: CatalogItem }) {
+export function CatalogCard({
+  item,
+  clients,
+  trips,
+}: {
+  item: CatalogItem;
+  clients: { id: string; name: string }[];
+  trips: Trip[];
+}) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
+  const [pedidoOpen, setPedidoOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
 
@@ -82,30 +93,40 @@ export function CatalogCard({ item }: { item: CatalogItem }) {
           </p>
         )}
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="space-y-2 pt-1">
           <Button
-            variant="outline"
             size="sm"
-            className="h-9 flex-1"
-            onClick={() => setEditOpen(true)}
+            className="h-9 w-full"
+            onClick={() => setPedidoOpen(true)}
           >
-            <Pencil className="h-3.5 w-3.5" />
-            Editar
+            <ShoppingCart className="h-3.5 w-3.5" />
+            Crear pedido
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 w-9 shrink-0 p-0 text-slate-400 hover:text-destructive"
-            onClick={() => setConfirmOpen(true)}
-            disabled={pending}
-            aria-label={`Eliminar ${item.name}`}
-          >
-            {pending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 flex-1"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 shrink-0 p-0 text-slate-400 hover:text-destructive"
+              onClick={() => setConfirmOpen(true)}
+              disabled={pending}
+              aria-label={`Eliminar ${item.name}`}
+            >
+              {pending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -114,6 +135,14 @@ export function CatalogCard({ item }: { item: CatalogItem }) {
         open={editOpen}
         hideTrigger
         onOpenChange={setEditOpen}
+      />
+
+      <CatalogToPreorderDialog
+        item={item}
+        clients={clients}
+        trips={trips}
+        open={pedidoOpen}
+        onOpenChange={setPedidoOpen}
       />
 
       <ConfirmDialog

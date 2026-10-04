@@ -56,6 +56,7 @@ import {
 import { encogerFoto, extensionDeArchivo } from "@/lib/images-browser";
 import { PREORDER_STATUS_OPTIONS } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/client";
+import { ImageCropper } from "@/components/catalog/image-cropper";
 import type { PreorderStatus, ProductCategory } from "@/types/database.types";
 
 export interface PreorderFormData {
@@ -140,6 +141,8 @@ export function PreorderFormDialog({
   const [archivo, setArchivo] = React.useState<File | null>(null);
   const [vistaPrevia, setVistaPrevia] = React.useState<string | null>(null);
   const [quitarFoto, setQuitarFoto] = React.useState(false);
+  // La foto recién elegida, esperando a que se recorte cuadrada.
+  const [recorte, setRecorte] = React.useState<File | null>(null);
   const entradaDeArchivo = React.useRef<HTMLInputElement>(null);
 
   // La vista previa es una URL de objeto y hay que devolverla: si no, el
@@ -206,8 +209,11 @@ export function PreorderFormDialog({
       if (entradaDeArchivo.current) entradaDeArchivo.current.value = "";
       return;
     }
-    setQuitarFoto(false);
-    setArchivo(elegido);
+    // No se sube directo: primero pasa por el recorte cuadrado.
+    setRecorte(elegido);
+    // Se limpia el input para que elegir la MISMA foto otra vez vuelva a abrir
+    // el recorte (si no, onChange no dispara con el mismo archivo).
+    if (entradaDeArchivo.current) entradaDeArchivo.current.value = "";
   }
 
   /**
@@ -443,10 +449,23 @@ export function PreorderFormDialog({
                 onChange={(e) => elegirArchivo(e.target.files?.[0] ?? null)}
               />
               <p className="text-xs text-slate-400">
-                Se encoge sola antes de subir. Sirve para recordar cuál era
-                exactamente el producto que te pidieron.
+                Se recorta cuadrada y se encoge antes de subir. Sirve para
+                recordar cuál era el producto que te pidieron.
               </p>
             </div>
+
+            {recorte && (
+              <ImageCropper
+                file={recorte}
+                open
+                onCancel={() => setRecorte(null)}
+                onCropped={(recortada) => {
+                  setQuitarFoto(false);
+                  setArchivo(recortada);
+                  setRecorte(null);
+                }}
+              />
+            )}
 
             <FormField
               control={form.control}

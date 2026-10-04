@@ -106,8 +106,8 @@ export function PreorderCard({
 
   return (
     <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2.5">
           {preorder.image_url && (
             <a
               href={preorder.image_url}
@@ -120,49 +120,53 @@ export function PreorderCard({
               <img
                 src={preorder.image_url}
                 alt=""
-                className="h-16 w-16 rounded-md border border-slate-200 object-cover dark:border-slate-800"
+                className="h-14 w-14 rounded-md border border-slate-200 object-cover dark:border-slate-800"
               />
             </a>
           )}
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2">
-              <CategoryBadge category={preorder.category} />
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
+                {preorder.product_name}
+              </p>
+              {preorder.estimated_price !== null &&
+                preorder.estimated_price !== undefined && (
+                  <span className="shrink-0 text-sm font-bold text-slate-700 dark:text-slate-300">
+                    {formatCurrency(Number(preorder.estimated_price))}
+                  </span>
+                )}
             </div>
-            <p className="font-medium leading-snug text-slate-900 dark:text-slate-100">
-              {preorder.product_name}
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              {clientName} · Cantidad: {preorder.quantity ?? 1}
-            </p>
-            <span
-              className={cn(
-                "mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
-                preorder.trip_date
-                  ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300"
-                  : "border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400"
-              )}
-            >
-              <Plane className="h-2.5 w-2.5" />
-              {preorder.trip_date
-                ? etiquetaViajeCorta(preorder.trip_date)
-                : "Sin viaje"}
-            </span>
-            {preorder.estimated_price !== null &&
-              preorder.estimated_price !== undefined && (
-                <p className="mt-0.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Est. {formatCurrency(Number(preorder.estimated_price))}
-                </p>
-              )}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <CategoryBadge
+                category={preorder.category}
+                className="px-1.5 py-0 text-[10px]"
+              />
+              <span className="truncate text-xs text-slate-500 dark:text-slate-400">
+                {clientName} · {preorder.quantity ?? 1}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                  preorder.trip_date
+                    ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300"
+                    : "border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400"
+                )}
+              >
+                <Plane className="h-2.5 w-2.5" />
+                {preorder.trip_date
+                  ? etiquetaViajeCorta(preorder.trip_date)
+                  : "Sin viaje"}
+              </span>
+            </div>
+            {preorder.notes && (
+              <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
+                {preorder.notes}
+              </p>
+            )}
           </div>
         </div>
 
-        {preorder.notes && (
-          <p className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-            {preorder.notes}
-          </p>
-        )}
-
-        <div className="mt-3 grid grid-cols-4 gap-1">
+        <div className="mt-2 grid grid-cols-4 gap-1">
           {PREORDER_STATUS_OPTIONS.map((option) => {
             const active = preorder.status === option.value;
             return (
@@ -172,7 +176,7 @@ export function PreorderCard({
                 disabled={pending}
                 onClick={() => handleStatus(option.value)}
                 className={cn(
-                  "min-h-11 rounded-md border px-1 text-[11px] font-medium transition-colors",
+                  "min-h-8 rounded-md border px-1 text-[10px] font-medium transition-colors",
                   active
                     ? cn(PREORDER_STATUS_STYLES[option.value])
                     : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -184,68 +188,72 @@ export function PreorderCard({
           })}
         </div>
 
-        {/*
-          El enlace va a la ficha del cliente y no a la lista de ventas: la
-          lista obliga a buscar entre todas y la ficha enseña justo sus
-          compras. Al convertir, el pedido se queda con el cliente de la
-          venta, así que siempre tiene a dónde ir.
-        */}
-        {yaEsVenta ? (
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="mt-3 h-11 w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
-          >
-            <Link
-              href={
-                preorder.client_id ? `/clientes/${preorder.client_id}` : "/ventas"
-              }
+        <div className="mt-1.5 flex items-center gap-2">
+          {/*
+            El enlace va a la ficha del cliente y no a la lista de ventas: la
+            ficha enseña justo sus compras. Al convertir, el pedido se queda
+            con el cliente de la venta, así que siempre tiene a dónde ir.
+          */}
+          {yaEsVenta ? (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-8 flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Ya es una venta · verla
-            </Link>
-          </Button>
-        ) : (
-          sePuedeConvertir && (
+              <Link
+                href={
+                  preorder.client_id
+                    ? `/clientes/${preorder.client_id}`
+                    : "/ventas"
+                }
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Ya es venta
+              </Link>
+            </Button>
+          ) : sePuedeConvertir ? (
             <Button
               size="sm"
-              className="mt-3 h-11 w-full"
+              className="h-8 flex-1"
               onClick={() => setConvertOpen(true)}
             >
               <ShoppingCart className="h-3.5 w-3.5" />
               Convertir en venta
             </Button>
-          )
-        )}
+          ) : (
+            <span className="flex-1" />
+          )}
 
-        <div className="mt-2 flex items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 flex-1"
+            size="icon"
+            className="h-8 w-8 shrink-0"
             onClick={() => setEditOpen(true)}
+            aria-label="Editar pedido"
           >
             <Pencil className="h-3.5 w-3.5" />
-            Editar
           </Button>
           <Button
             variant="outline"
             size="sm"
             className={cn(
-              "h-9 flex-1",
-              confirmDelete &&
-                "border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              "h-8 shrink-0",
+              confirmDelete
+                ? "border-destructive bg-destructive px-2 text-destructive-foreground hover:bg-destructive/90"
+                : "w-8 px-0"
             )}
             onClick={handleDelete}
             disabled={pending}
+            aria-label={confirmDelete ? "Confirmar eliminar" : "Eliminar pedido"}
           >
             {pending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : confirmDelete ? (
+              <span className="text-xs">¿Borrar?</span>
             ) : (
               <Trash2 className="h-3.5 w-3.5" />
             )}
-            {confirmDelete ? "¿Confirmar?" : "Eliminar"}
           </Button>
         </div>
       </CardContent>

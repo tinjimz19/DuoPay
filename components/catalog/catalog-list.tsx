@@ -8,8 +8,17 @@ import { CatalogExportButton } from "@/components/catalog/catalog-export-button"
 import { useCategories } from "@/components/categories-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { ordenarCategorias } from "@/lib/catalog-order";
+import type { Trip } from "@/lib/trip";
 
-export function CatalogList({ items }: { items: CatalogItem[] }) {
+export function CatalogList({
+  items,
+  clients,
+  trips,
+}: {
+  items: CatalogItem[];
+  clients: { id: string; name: string }[];
+  trips: Trip[];
+}) {
   const categorias = useCategories();
 
   const grupos = React.useMemo(() => {
@@ -59,7 +68,12 @@ export function CatalogList({ items }: { items: CatalogItem[] }) {
               </h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {grupo.items.map((item) => (
-                  <CatalogCard key={item.id} item={item} />
+                  <CatalogCard
+                    key={item.id}
+                    item={item}
+                    clients={clients}
+                    trips={trips}
+                  />
                 ))}
               </div>
             </section>

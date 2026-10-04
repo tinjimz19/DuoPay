@@ -1,6 +1,6 @@
 "use client";
 
-import { PackageSearch } from "lucide-react";
+import { PackageSearch, Search } from "lucide-react";
 import * as React from "react";
 
 import { Paginacion, usePagination } from "@/components/pagination";
@@ -9,6 +9,7 @@ import { PreorderExportButton } from "@/components/preorders/preorder-export-but
 import { PreorderFormDialog } from "@/components/preorders/preorder-form-dialog";
 import { TripsBar } from "@/components/preorders/trips-bar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { caracasDateStr } from "@/lib/format";
 import { SIN_VIAJE, etiquetaViajeLarga, type Trip } from "@/lib/trip";
@@ -35,6 +36,25 @@ function viajeInicial(trips: Trip[]): string {
   return proximo?.id ?? SIN_VIAJE;
 }
 
+/** Texto comparable: sin acentos, en minúsculas. */
+function comparable(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+/** ¿El pedido coincide con lo buscado? Mira producto, cliente y notas. */
+function coincideBusqueda(p: PreorderCardData, q: string): boolean {
+  const campos = [
+    p.product_name,
+    p.client_name ?? "",
+    p.client_name_raw ?? "",
+    p.notes ?? "",
+  ];
+  return campos.some((c) => comparable(c).includes(q));
+}
+
 export function PreorderList({
   preorders,
   clients,
@@ -51,6 +71,7 @@ export function PreorderList({
   const [category, setCategory] = React.useState<string>("CALZADO");
   // Se abre en lo que falta por comprar, que es el trabajo del día.
   const [status, setStatus] = React.useState<PreorderStatus>("PENDENT");
+  const [query, setQuery] = React.useState("");
 
   const coincideViaje = React.useCallback(
     (p: PreorderCardData) =>
@@ -64,14 +85,19 @@ export function PreorderList({
     [preorders, coincideViaje]
   );
 
-  const filtered = React.useMemo(
-    () =>
-      delViaje.filter((p) => p.category === category && p.status === status),
-    [delViaje, category, status]
-  );
+  // Al buscar, se busca en TODO el viaje (sin importar la pestaña de categoría
+  // ni de estado): así el pedido aparece aunque esté en otra pestaña. Sin
+  // búsqueda, mandan las pestañas.
+  const filtered = React.useMemo(() => {
+    const q = comparable(query.trim());
+    if (q) return delViaje.filter((p) => coincideBusqueda(p, q));
+    return delViaje.filter(
+      (p) => p.category === category && p.status === status
+    );
+  }, [delViaje, category, status, query]);
 
   const pagina = usePagination(filtered, {
-    resetKey: `${trip}|${category}|${status}`,
+    resetKey: `${trip}|${category}|${status}|${query}`,
   });
 
   const viajeSel = trips.find((t) => t.id === trip) ?? null;
@@ -96,6 +122,19 @@ export function PreorderList({
             preorders={delViaje}
             tripTitulo={tripTitulo}
             tripArchivo={tripArchivo}
+          />
+        </div>
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            type="search"
+            inputMode="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar producto o cliente…"
+            className="h-10 pl-9"
+            aria-label="Buscar pedidos"
           />
         </div>
 
