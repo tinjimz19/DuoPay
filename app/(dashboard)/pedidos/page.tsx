@@ -1,4 +1,5 @@
 import { PreorderList } from "@/components/preorders/preorder-list";
+import { bucketYRutaDeImagen } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
 import type { PreorderCardData } from "@/components/preorders/preorder-card";
 
@@ -39,17 +40,39 @@ export default async function PedidosPage({
     en plural— en vez de una por tarjeta: cuarenta pedidos serían cuarenta
     viajes en fila y la página tardaría un segundo largo en aparecer.
   */
-  const rutasDeFoto = (preorders ?? [])
-    .map((p) => p.image_path)
-    .filter((r): r is string => Boolean(r));
+  const refs = Array.from(
+    new Set(
+      (preorders ?? [])
+        .map((p) => p.image_path)
+        .filter((r): r is string => Boolean(r))
+    )
+  );
 
+  // `firmadas` queda indexado por el `image_path` guardado (la ref), que es lo
+  // que se compara abajo. Un pedido normal firma desde "pedidos"; uno que
+  // reusa la foto del catálogo, desde "catalogo". Se agrupan por depósito y se
+  // firman todas de una por depósito.
   const firmadas = new Map<string, string>();
-  if (rutasDeFoto.length > 0) {
-    const { data: urls } = await supabase.storage
-      .from("pedidos")
-      .createSignedUrls(Array.from(new Set(rutasDeFoto)), 60 * 60);
-    for (const item of urls ?? []) {
-      if (item.path && item.signedUrl) firmadas.set(item.path, item.signedUrl);
+  if (refs.length > 0) {
+    const porBucket = new Map<string, string[]>();
+    const refPorRuta = new Map<string, string>();
+    for (const ref of refs) {
+      const { bucket, path } = bucketYRutaDeImagen(ref);
+      const lista = porBucket.get(bucket) ?? [];
+      lista.push(path);
+      porBucket.set(bucket, lista);
+      refPorRuta.set(`${bucket}|${path}`, ref);
+    }
+    for (const [bucket, paths] of Array.from(porBucket.entries())) {
+      const { data: urls } = await supabase.storage
+        .from(bucket)
+        .createSignedUrls(Array.from(new Set(paths)), 60 * 60);
+      for (const item of urls ?? []) {
+        if (item.path && item.signedUrl) {
+          const ref = refPorRuta.get(`${bucket}|${item.path}`);
+          if (ref) firmadas.set(ref, item.signedUrl);
+        }
+      }
     }
   }
 

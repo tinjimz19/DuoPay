@@ -50,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/components/categories-provider";
 import {
   BUCKET_DE_PEDIDOS,
+  esRefDeCatalogo,
   revisarFoto,
   rutaDeFotoDePedido,
 } from "@/lib/images";
@@ -231,10 +232,15 @@ export function PreorderFormDialog({
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Se venció la sesión. Vuelve a entrar.");
 
+    // Si la foto actual es una REUSADA del catálogo, no se borra del depósito:
+    // es el mismo archivo del catálogo y borrarlo dejaría al producto sin foto.
+    // Solo se suelta la referencia (la columna).
+    const previaEsCatalogo = esRefDeCatalogo(preorder?.image_path);
+
     // Quitar: primero el archivo, después la columna. Al revés quedaría el
     // archivo ocupando sitio para siempre, sin nada que apunte a él.
     if (quitarFoto && !archivo) {
-      if (preorder?.image_path) {
+      if (preorder?.image_path && !previaEsCatalogo) {
         await supabase.storage
           .from(BUCKET_DE_PEDIDOS)
           .remove([preorder.image_path]);
@@ -257,8 +263,13 @@ export function PreorderFormDialog({
     const res = await setPreorderImage(pedidoId, ruta);
     if (!res.success) throw new Error(res.error ?? "No se pudo guardar la foto.");
 
-    // La anterior ya no la apunta nadie: fuera, que el plan es de 1 GB.
-    if (preorder?.image_path && preorder.image_path !== ruta) {
+    // La anterior ya no la apunta nadie: fuera, que el plan es de 1 GB. Pero
+    // si era la del catálogo (reusada), NO se toca: no es nuestra para borrar.
+    if (
+      preorder?.image_path &&
+      !previaEsCatalogo &&
+      preorder.image_path !== ruta
+    ) {
       await supabase.storage
         .from(BUCKET_DE_PEDIDOS)
         .remove([preorder.image_path]);

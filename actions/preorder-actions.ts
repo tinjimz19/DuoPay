@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { ensureClient } from "@/lib/clients-server";
+import { bucketYRutaDeImagen } from "@/lib/images";
 import {
   dbErrorMessage,
   newClientSchema,
@@ -311,11 +312,16 @@ export async function setPreorderImage(id: string, imagePath: string | null) {
     return { success: false, error: "No autorizado" };
   }
 
-  // Que la ruta sea de SU carpeta. El depósito ya lo impide al subir, pero
-  // esta columna se puede escribir sin subir nada, y una ruta ajena aquí
-  // serviría para mirar la foto de otra tienda.
-  if (imagePath && !imagePath.startsWith(`${user.id}/`)) {
-    return { success: false, error: "Ruta de foto inválida" };
+  // La ruta real debe ser de SU carpeta. El depósito ya lo impide al subir,
+  // pero esta columna se puede escribir sin subir nada, y una ruta ajena aquí
+  // serviría para mirar la foto de otra tienda. Vale tanto una ruta del
+  // depósito de pedidos como una referencia reusada del catálogo
+  // (catalogo:<carpeta>/...); en ambos casos la carpeta debe ser la suya.
+  if (imagePath) {
+    const { path } = bucketYRutaDeImagen(imagePath);
+    if (!path.startsWith(`${user.id}/`)) {
+      return { success: false, error: "Ruta de foto inválida" };
+    }
   }
 
   const { error } = await supabase

@@ -24,6 +24,41 @@ export const BUCKET_DE_PEDIDOS = "pedidos";
 /** El depósito de las imágenes del catálogo. Privado, igual que el de pedidos. */
 export const BUCKET_DE_CATALOGO = "catalogo";
 
+/**
+ * Prefijo para un pedido que REUSA la imagen del catálogo.
+ *
+ * El `image_path` de un pedido suele vivir en el depósito `pedidos`. Pero
+ * cuando el pedido se crea desde el catálogo, apunta al MISMO objeto del
+ * depósito `catalogo` —el mismo archivo, el mismo enlace— en vez de resubirlo
+ * y ocupar el doble del poco espacio del plan gratis. Esas referencias se
+ * marcan con este prefijo para saber de qué depósito firmar la dirección.
+ *
+ * OJO: al reusar, borrar ese producto del catálogo deja al pedido sin foto,
+ * porque es literalmente el mismo archivo. Es el precio de no duplicarlo.
+ */
+export const REF_CATALOGO = "catalogo:";
+
+/** ¿Este `image_path` apunta a una imagen del catálogo (reusada)? */
+export function esRefDeCatalogo(ref: string | null | undefined): boolean {
+  return typeof ref === "string" && ref.startsWith(REF_CATALOGO);
+}
+
+/** Marca una ruta del catálogo como referencia reusable desde un pedido. */
+export function refDeCatalogo(path: string): string {
+  return `${REF_CATALOGO}${path}`;
+}
+
+/** De un `image_path` guardado, saca en qué depósito está y su ruta real. */
+export function bucketYRutaDeImagen(ref: string): {
+  bucket: string;
+  path: string;
+} {
+  if (ref.startsWith(REF_CATALOGO)) {
+    return { bucket: BUCKET_DE_CATALOGO, path: ref.slice(REF_CATALOGO.length) };
+  }
+  return { bucket: BUCKET_DE_PEDIDOS, path: ref };
+}
+
 /** El lado largo al que se encoge la foto antes de subirla. */
 export const LADO_MAXIMO = 1280;
 
