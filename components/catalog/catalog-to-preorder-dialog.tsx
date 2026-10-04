@@ -191,11 +191,16 @@ export function CatalogToPreorderDialog({
       return;
     }
 
+    // El id viene opcional en el tipo de retorno; se protege antes de usarlo.
+    const pedidoId = res.id ?? "";
     let avisoFoto: string | null = null;
-    try {
-      await guardarFoto(res.id);
-    } catch (e) {
-      avisoFoto = e instanceof Error ? e.message : "No se pudo guardar la foto.";
+    if (pedidoId) {
+      try {
+        await guardarFoto(pedidoId);
+      } catch (e) {
+        avisoFoto =
+          e instanceof Error ? e.message : "No se pudo guardar la foto.";
+      }
     }
     setLoading(false);
 
