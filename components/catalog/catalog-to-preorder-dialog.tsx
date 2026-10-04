@@ -95,8 +95,6 @@ export function CatalogToPreorderDialog({
           ? { name: client.name, phone: client.phone }
           : null,
       tripId: tripSel === SIN_VIAJE ? null : tripSel,
-      // El catálogo no mueve inventario: el pedido nace sin productos de stock.
-      items: [],
     });
     setLoading(false);
 
