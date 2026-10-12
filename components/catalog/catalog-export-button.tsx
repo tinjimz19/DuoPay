@@ -6,8 +6,8 @@ import { toast } from "sonner";
 
 import type { CatalogItem } from "@/components/catalog/catalog-card";
 import { Button } from "@/components/ui/button";
+import { codigoDeReferencia } from "@/lib/catalog-ref";
 import { ordenarCategorias } from "@/lib/catalog-order";
-import { formatCurrency } from "@/lib/format";
 
 /**
  * Exporta el catálogo a PDF: una portada con el nombre de la tienda y luego
@@ -185,13 +185,11 @@ export function CatalogExportButton({
         doc.text(nombre, x, ty);
         ty += nombre.length * 4.6 + 1.5;
 
-        if (it.price !== null) {
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(11);
-          doc.setTextColor(60, 60, 200);
-          doc.text(formatCurrency(it.price), x, ty);
-          ty += 5;
-        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(60, 60, 200);
+        doc.text(`Cód. ${codigoDeReferencia(it.ref_code)}`, x, ty);
+        ty += 5;
 
         if (it.note) {
           doc.setFont("helvetica", "normal");

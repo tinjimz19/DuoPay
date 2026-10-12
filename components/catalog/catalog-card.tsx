@@ -11,12 +11,15 @@ import { CatalogFormDialog } from "@/components/catalog/catalog-form-dialog";
 import { CatalogToPreorderDialog } from "@/components/catalog/catalog-to-preorder-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { codigoDeReferencia } from "@/lib/catalog-ref";
 import { formatCurrency } from "@/lib/format";
 import type { Trip } from "@/lib/trip";
 import type { ProductCategory } from "@/types/database.types";
 
 export interface CatalogItem {
   id: string;
+  /** Código de referencia secuencial por tienda (001, 002 …). */
+  ref_code: number | null;
   name: string;
   category: ProductCategory;
   price: number | null;
@@ -78,6 +81,9 @@ export function CatalogCard({
             category={item.category}
             className="shrink-0 px-1.5 py-0 text-[10px] font-semibold"
           />
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            Cód. {codigoDeReferencia(item.ref_code)}
+          </span>
         </div>
         <p className="truncate font-medium leading-snug text-slate-900 dark:text-slate-100">
           {item.name}

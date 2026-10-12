@@ -337,6 +337,8 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          /** Código secuencial por tienda (001, 002 …). Lo asigna la base. */
+          ref_code: number | null;
           name: string;
           category: ProductCategory;
           price: number | null;
@@ -349,6 +351,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id?: string;
+          ref_code?: number | null;
           name: string;
           category?: ProductCategory;
           price?: number | null;
@@ -360,6 +363,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          ref_code?: number | null;
           name?: string;
           category?: ProductCategory;
           price?: number | null;

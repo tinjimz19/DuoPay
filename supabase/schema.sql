@@ -992,6 +992,9 @@ GRANT EXECUTE ON FUNCTION public.category_usage() TO authenticated;
 CREATE TABLE IF NOT EXISTS public.catalog_products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  -- Código secuencial por tienda (001, 002 …) para identificar el producto y
+  -- dictarlo al pedir por WhatsApp. Lo pone el trigger de más abajo.
+  ref_code INTEGER,
   name TEXT NOT NULL CHECK (length(btrim(name)) > 0),
   category TEXT NOT NULL DEFAULT 'CALZADO' CHECK (category ~ '^[A-Z0-9_]{2,32}$'),
   price NUMERIC(10, 2) CHECK (price IS NULL OR price >= 0),
@@ -1012,6 +1015,30 @@ CREATE POLICY "Aislamiento por usuario en catalogo"
 CREATE INDEX IF NOT EXISTS idx_catalog_user
   ON public.catalog_products(user_id, category, created_at)
   WHERE deleted_at IS NULL;
+
+-- El próximo código de la tienda al crear un producto. En la base (no en la
+-- app) para que toda alta quede numerada. Una tienda agrega de a uno: MAX+1
+-- basta, sin carrera posible.
+CREATE OR REPLACE FUNCTION public.set_catalog_ref_code()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.ref_code IS NULL THEN
+    SELECT COALESCE(MAX(ref_code), 0) + 1
+      INTO NEW.ref_code
+      FROM public.catalog_products
+      WHERE user_id = NEW.user_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_catalog_ref_code ON public.catalog_products;
+CREATE TRIGGER trg_catalog_ref_code
+  BEFORE INSERT ON public.catalog_products
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_catalog_ref_code();
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('catalogo', 'catalogo', false)
@@ -1102,10 +1129,10 @@ AS $$
       SELECT jsonb_agg(
         jsonb_build_object(
           'id', c.id,
+          'ref_code', c.ref_code,
           'name', c.name,
           'category', c.category,
           'category_label', COALESCE(cat.label, c.category),
-          'price', c.price,
           'note', c.note,
           'image_path', c.image_path
         )

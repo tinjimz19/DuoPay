@@ -2,7 +2,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Metadata } from "next";
 import { cache } from "react";
 
-import { formatCurrency } from "@/lib/format";
+import { codigoDeReferencia } from "@/lib/catalog-ref";
 import { BUCKET_DE_CATALOGO } from "@/lib/images";
 import type { Database } from "@/types/database.types";
 
@@ -13,10 +13,10 @@ export const revalidate = 30;
 
 interface PublicProduct {
   id: string;
+  ref_code: number | null;
   name: string;
   category: string;
   category_label: string;
-  price: number | null;
   note: string | null;
   image_path: string | null;
 }
@@ -175,14 +175,12 @@ export default async function CatalogoPublicoPage({
                         ) : null}
                       </div>
                       <div className="space-y-0.5 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                          Cód. {codigoDeReferencia(p.ref_code)}
+                        </p>
                         <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                           {p.name}
                         </p>
-                        {p.price !== null && (
-                          <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                            {formatCurrency(Number(p.price))}
-                          </p>
-                        )}
                         {p.note && (
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                             {p.note}
@@ -190,10 +188,9 @@ export default async function CatalogoPublicoPage({
                         )}
                         <a
                           href={waLink(
-                            `Hola, me interesa este producto del catálogo: ${p.name}` +
-                              (p.price !== null
-                                ? ` — ${formatCurrency(Number(p.price))}`
-                                : "")
+                            `Hola, me interesa el producto ${codigoDeReferencia(
+                              p.ref_code
+                            )} del catálogo: ${p.name}`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"

@@ -26,7 +26,7 @@ export default async function CatalogoPage() {
     await Promise.all([
       supabase
         .from("catalog_products")
-        .select("id, name, category, price, note, image_path, created_at")
+        .select("id, ref_code, name, category, price, note, image_path, created_at")
         .is("deleted_at", null)
         .order("created_at", { ascending: false }),
       supabase
@@ -58,6 +58,7 @@ export default async function CatalogoPage() {
 
   const items: CatalogItem[] = (rows ?? []).map((r) => ({
     id: r.id,
+    ref_code: r.ref_code,
     name: r.name,
     category: r.category,
     price: r.price !== null ? Number(r.price) : null,
