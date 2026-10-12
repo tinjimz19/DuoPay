@@ -54,6 +54,8 @@ export async function updateSession(request: NextRequest) {
 
   const signedIn = tieneCookieDeSesion(request);
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
+  // La página pública del catálogo (/c/<slug>) se ve sin sesión: es el punto.
+  const isPublicRoute = request.nextUrl.pathname.startsWith("/c/");
 
   // El marcador lo pone un layout que NO pudo confirmar la sesión. Si aun
   // así lo devolviéramos al inicio, ese layout lo volvería a mandar aquí y
@@ -61,7 +63,7 @@ export async function updateSession(request: NextRequest) {
   const vieneDeSesionVencida =
     request.nextUrl.searchParams.get("sesion") === "vencida";
 
-  if (!signedIn && !isLoginRoute) {
+  if (!signedIn && !isLoginRoute && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname);

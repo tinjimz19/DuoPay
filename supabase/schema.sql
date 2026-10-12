@@ -1070,3 +1070,56 @@ ALTER TABLE public.preorders
 CREATE INDEX IF NOT EXISTS idx_preorders_trip
   ON public.preorders(trip_id)
   WHERE deleted_at IS NULL;
+
+
+-- ------------------------------------------------------------
+-- 20. CATÁLOGO PÚBLICO · página compartible por enlace
+--
+-- Un slug al azar por tienda; quien tenga /c/<slug> ve el catálogo sin login.
+-- El depósito de imágenes del catálogo es público de lectura, y una función
+-- SECURITY DEFINER devuelve el catálogo de la tienda cuyo slug coincide.
+-- Para una base que YA existe, ejecuta supabase/patch-08-catalogo-publico.sql.
+-- ------------------------------------------------------------
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS catalog_slug TEXT;
+
+DO $$ BEGIN
+  ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_catalog_slug_key UNIQUE (catalog_slug);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+UPDATE storage.buckets SET public = true WHERE id = 'catalogo';
+
+CREATE OR REPLACE FUNCTION public.catalogo_publico(p_slug TEXT)
+RETURNS JSONB
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT jsonb_build_object(
+    'business_name', pr.business_name,
+    'logo_url', pr.logo_url,
+    'products', COALESCE((
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'id', c.id,
+          'name', c.name,
+          'category', c.category,
+          'category_label', COALESCE(cat.label, c.category),
+          'price', c.price,
+          'note', c.note,
+          'image_path', c.image_path
+        )
+        ORDER BY (c.category <> 'CALZADO'), COALESCE(cat.label, c.category), c.created_at DESC
+      )
+      FROM public.catalog_products c
+      LEFT JOIN public.categories cat ON cat.slug = c.category
+      WHERE c.user_id = pr.id AND c.deleted_at IS NULL
+    ), '[]'::jsonb)
+  )
+  FROM public.profiles pr
+  WHERE pr.catalog_slug = p_slug
+  LIMIT 1;
+$$;
+
+REVOKE ALL ON FUNCTION public.catalogo_publico(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.catalogo_publico(TEXT) TO anon, authenticated;

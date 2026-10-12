@@ -39,6 +39,7 @@ export interface Database {
           trial_ends_at: string | null;
           subscription_ends_at: string | null;
           logo_url: string | null;
+          catalog_slug: string | null;
           created_at: string;
         };
         Insert: {
@@ -50,6 +51,7 @@ export interface Database {
           trial_ends_at?: string | null;
           subscription_ends_at?: string | null;
           logo_url?: string | null;
+          catalog_slug?: string | null;
           created_at?: string;
         };
         Update: {
@@ -61,6 +63,7 @@ export interface Database {
           trial_ends_at?: string | null;
           subscription_ends_at?: string | null;
           logo_url?: string | null;
+          catalog_slug?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -583,6 +586,15 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      /**
+       * El catálogo público de una tienda por su slug, sin login. Devuelve
+       * JSON con el nombre, el logo y los productos, o null si el slug no
+       * existe. La firma la decide la función en la base (SECURITY DEFINER).
+       */
+      catalogo_publico: {
+        Args: { p_slug: string };
+        Returns: Json;
+      };
       /**
        * Convierte un pedido en venta: crea la venta y marca el pedido, las
        * dos cosas dentro de una transacción y con la fila del pedido

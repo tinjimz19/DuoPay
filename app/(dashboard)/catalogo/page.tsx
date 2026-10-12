@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CatalogFormDialog } from "@/components/catalog/catalog-form-dialog";
 import type { CatalogItem } from "@/components/catalog/catalog-card";
 import { CatalogList } from "@/components/catalog/catalog-list";
+import { CatalogShareButton } from "@/components/catalog/catalog-share-button";
 import { currentAccount, LOGIN_SESION_VENCIDA } from "@/lib/auth-server";
 import { puedeVerCatalogo } from "@/lib/catalog-access";
 import { BUCKET_DE_CATALOGO } from "@/lib/images";
@@ -76,7 +77,10 @@ export default async function CatalogoPage() {
             Tus productos para enseñar y compartir
           </p>
         </div>
-        <CatalogFormDialog />
+        <div className="flex items-center gap-2">
+          <CatalogShareButton />
+          <CatalogFormDialog />
+        </div>
       </div>
 
       <CatalogList

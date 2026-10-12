@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "crypto";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -185,4 +187,50 @@ export async function setCatalogImage(
 
   revalidarCatalogo();
   return { success: true };
+}
+
+/** Un slug corto y seguro (sin símbolos raros) para la dirección pública. */
+function nuevoSlug(): string {
+  return randomBytes(6).toString("base64url");
+}
+
+/**
+ * Devuelve el slug del catálogo público, creándolo la primera vez. Con él se
+ * arma el enlace /c/<slug>. Gateado al usuario del catálogo: solo esa cuenta
+ * puede generar el enlace de su catálogo.
+ */
+export async function obtenerLinkCatalogo(): Promise<
+  ActionResult<{ slug: string }>
+> {
+  const cuenta = await cuentaDeCatalogo();
+  if ("error" in cuenta) return { success: false, error: cuenta.error };
+  const { supabase, userId } = cuenta;
+
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("catalog_slug")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (perfil?.catalog_slug) return { success: true, slug: perfil.catalog_slug };
+
+  // Reintenta por si el slug al azar choca con el índice único (rarísimo).
+  for (let i = 0; i < 5; i++) {
+    const slug = nuevoSlug();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ catalog_slug: slug })
+      .eq("id", userId);
+    if (!error) {
+      revalidatePath("/catalogo");
+      return { success: true, slug };
+    }
+    if (!/duplicate|unique/i.test(error.message)) {
+      return { success: false, error: dbErrorMessage(error.message) };
+    }
+  }
+  return {
+    success: false,
+    error: "No se pudo crear el enlace. Intenta de nuevo.",
+  };
 }
