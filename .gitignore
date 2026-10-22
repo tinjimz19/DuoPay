@@ -35,3 +35,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 Claude outputs/
+
+# Respaldos y material que no va en el repo
+promo/
+_respaldo_mensajes/
+_to_delete/
+_mensaje-commit.txt
