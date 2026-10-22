@@ -102,9 +102,9 @@ export default async function DashboardPage() {
     0
   );
 
-  // Lo que toca cobrar en esta jornada, y a cuánta gente.
+  // Lo que toca cobrar en esta jornada, y a cuánta gente. El desglose de
+  // atrasados es "detalle" y vive en Cobranza; aquí Inicio es solo el resumen.
   const clientesPorCobrar = new Set<string>();
-  let atrasadas = 0;
   let quincenaTotal = 0;
   for (const sale of openSales ?? []) {
     const schedule = saleSchedule({
@@ -117,7 +117,6 @@ export default async function DashboardPage() {
     if (schedule.dueNow <= 0) continue;
     quincenaTotal += schedule.dueNow;
     clientesPorCobrar.add(sale.client_id);
-    if (schedule.behind > 0) atrasadas += 1;
   }
   quincenaTotal = Math.round((quincenaTotal + Number.EPSILON) * 100) / 100;
 
@@ -164,14 +163,6 @@ export default async function DashboardPage() {
                     <p className="mt-2 truncate text-sm text-slate-600 dark:text-slate-400">
                       por cobrar a {clientesPorCobrar.size} cliente
                       {clientesPorCobrar.size === 1 ? "" : "s"}
-                      {atrasadas > 0 && (
-                        <>
-                          {" · "}
-                          <span className="font-semibold text-red-600 dark:text-red-400">
-                            {atrasadas} atrasada{atrasadas === 1 ? "" : "s"}
-                          </span>
-                        </>
-                      )}
                     </p>
                   </>
                 ) : (
